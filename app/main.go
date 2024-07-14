@@ -29,6 +29,8 @@ func main() {
 	switch command {
 	case ".dbinfo":
 		dbinfo(databaseFile, header)
+	case ".tables":
+		tables(databaseFile, header)
 	default:
 		fmt.Println("Unknown command", command)
 		os.Exit(1)
@@ -41,4 +43,14 @@ func dbinfo(databaseFile *os.File, header DatabaseHeader) {
 
 	fmt.Printf("database page size: %v\n", header.PageSize)
 	fmt.Printf("number of tables: %v\n", schema.TableCount())
+}
+
+func tables(databaseFile *os.File, header DatabaseHeader) {
+	schema := readSQLiteSchema(databaseFile, header)
+
+	for _, row := range schema.Rows {
+		if row.Type == "table" && row.Name != "sqlite_sequence" {
+			fmt.Println(row.Name)
+		}
+	}
 }
