@@ -17,7 +17,7 @@ type SQLiteSchema struct {
 }
 
 func readSQLiteSchema(databaseFile *os.File, dbHeader DatabaseHeader) SQLiteSchema {
-	records := readTable(databaseFile, dbHeader, 0)
+	records := readTable(databaseFile, dbHeader, 1)
 
 	var rows []SQLiteSchemaTuple
 	for _, record := range records {
@@ -43,5 +43,3 @@ func (schema SQLiteSchema) TableCount() int {
 	}
 	return count
 }
-
-
