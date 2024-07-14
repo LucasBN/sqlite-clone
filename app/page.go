@@ -14,17 +14,6 @@ const INT_TAB_PAGE = 5
 const LEAF_IDX_PAGE = 10
 const LEAF_TAB_PAGE = 13
 
-type DatabaseHeader struct {
-	HeaderString     [16]byte
-	PageSize         uint16
-	FileWriteVersion uint8
-	FileReadVersion  uint8
-	ReservedSpace    uint8
-	Middle           [38]byte
-	TextEncoding     uint32
-	End              [40]byte
-}
-
 type BTreeHeader struct {
 	PageType                uint8
 	FirstFreeBlock          uint16
@@ -35,9 +24,11 @@ type BTreeHeader struct {
 }
 
 type BTreePage struct {
-	Header           BTreeHeader
-	CellPointerArray []uint16
-	Cells            []Cell
+	Header         BTreeHeader
+	IntIdxCells    []IntIdxCell
+	IntTableCells  []IntTableCell
+	LeafIdxCells   []LeafIdxCell
+	LeafTableCells []LeafTableCell
 }
 
 // pageNum is zero indexed which may be different to the SQLite standard
@@ -55,6 +46,8 @@ func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint3
 	if err := binary.Read(databaseFile, binary.BigEndian, &header); err != nil {
 		fmt.Println("Failed to read integer:", err)
 	}
+
+	page := BTreePage{Header: header}
 
 	// If the page isn't an interior b-tree page, we move back four bytes in the
 	// file because the right most pointer isn't actually included in the header
@@ -74,7 +67,6 @@ func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint3
 	}
 
 	// Read the cells
-	var cells []Cell
 	for idx, cellStart := range cellPointerArray {
 		// The cellEnd of the cell is either the start of the next cell, or the
 		// end of the page minus however many bytes are reserved at the end of
@@ -94,12 +86,10 @@ func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint3
 			fmt.Println("Failed to read integer:", err)
 		}
 
-		cells = append(cells, readCell(dbHeader, cellBytes, header.PageType))
+		// Appends the cell to the correct field in the page, depending on the
+		// page type
+		readCell(&page, dbHeader, cellBytes)
 	}
 
-	return BTreePage{
-		Header:           header,
-		CellPointerArray: cellPointerArray,
-		Cells:            cells,
-	}
+	return page
 }

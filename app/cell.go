@@ -1,58 +1,47 @@
 package main
 
-type Cell struct {
-	CellType          uint8
-	TableLeafCell     *TableLeafCell
-	TableInteriorCell *TableInteriorCell
-	IndexLeafCell     *IndexLeafCell
-	IndexInteriorCell *IndexInteriorCell
-}
-
-// Idea: a cell struct shouldn't even be aware about the existance of pages, so
-// the payload should be the entire payload and not just the payload that fits
-// on the page where the cell begins
-type TableLeafCell struct {
+type LeafTableCell struct {
 	PayloadSize  uint64
 	RowID        uint64
 	Payload      []byte
 	OverflowPage *uint32
 }
 
-type TableInteriorCell struct {
+type LeafIdxCell struct {
 	LeftPage uint32
 	Key      uint64
 }
 
-type IndexLeafCell struct {
+type IntTableCell struct {
 	KeyPayloadSize uint64
 	Payload        []byte
 	OverflowPage   *uint32
 }
 
-type IndexInteriorCell struct {
+type IntIdxCell struct {
 	LeftPage       uint32
 	KeyPayloadSize uint64
 	Payload        []byte
 	Key            uint64
 }
 
-func readCell(header DatabaseHeader, data []byte, pageType uint8) Cell {
-	switch pageType {
+func readCell(page *BTreePage, dbHeader DatabaseHeader, data []byte) {
+	switch page.Header.PageType {
 	case LEAF_TAB_PAGE:
-		return Cell{CellType: pageType, TableLeafCell: readTableLeafCell(header, data)}
-	case INT_TAB_PAGE:
-		return Cell{CellType: pageType, TableInteriorCell: readTableInteriorCell(data)}
+		page.LeafTableCells = append(page.LeafTableCells, readLeafTableCell(dbHeader, data))
 	case LEAF_IDX_PAGE:
-		return Cell{CellType: pageType, IndexLeafCell: readIndexLeafCell(data)}
+		page.LeafIdxCells = append(page.LeafIdxCells, readLeafIdxCell(dbHeader, data))
+	case INT_TAB_PAGE:
+		page.IntTableCells = append(page.IntTableCells, readIntTableCell(dbHeader, data))
 	case INT_IDX_PAGE:
-		return Cell{CellType: pageType, IndexInteriorCell: readIndexInteriorCell(data)}
+		page.IntIdxCells = append(page.IntIdxCells, readIntIdxCell(dbHeader, data))
 	default:
 		panic("Unknown page type")
 	}
 }
 
-func readTableLeafCell(header DatabaseHeader, data []byte) *TableLeafCell {
-	var cell TableLeafCell
+func readLeafTableCell(header DatabaseHeader, data []byte) LeafTableCell {
+	var cell LeafTableCell
 
 	var offsetPayloadSize uint16
 	cell.PayloadSize, offsetPayloadSize = decodeVarInt(data[:9])
@@ -73,17 +62,17 @@ func readTableLeafCell(header DatabaseHeader, data []byte) *TableLeafCell {
 		panic("Payload overflow")
 	}
 
-	return &cell
+	return cell
 }
 
-func readTableInteriorCell(data []byte) *TableInteriorCell {
+func readLeafIdxCell(header DatabaseHeader, data []byte) LeafIdxCell {
 	panic("not implemented")
 }
 
-func readIndexLeafCell(data []byte) *IndexLeafCell {
+func readIntTableCell(header DatabaseHeader, data []byte) IntTableCell {
 	panic("not implemented")
 }
 
-func readIndexInteriorCell(data []byte) *IndexInteriorCell {
+func readIntIdxCell(header DatabaseHeader, data []byte) IntIdxCell {
 	panic("not implemented")
 }

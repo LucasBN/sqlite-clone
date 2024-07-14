@@ -33,6 +33,7 @@ func main() {
 		fmt.Println("Unknown command", command)
 		os.Exit(1)
 	}
+
 }
 
 func dbinfo(databaseFile *os.File, header DatabaseHeader) {
