@@ -33,26 +33,16 @@ func readSQLiteSchema(databaseFile *os.File, dbHeader DatabaseHeader) SQLiteSche
 	var rows []SQLiteSchemaTuple
 	switch page.Header.PageType {
 	case LEAF_TAB_PAGE:
-		for _, cell := range page.Cells {
-			// The cell type must match the page type
-			if cell.CellType != LEAF_TAB_PAGE {
-				panic("Cell type does not match page type")
-			}
-
-			// The cell must have the TableLeafCell field set
-			if cell.TableLeafCell == nil {
-				panic("Cell does not have TableLeafCell field set")
-			}
-
+		for _, cell := range page.LeafTableCells {
 			// We don't yet support the cell overflowing
-			if cell.TableLeafCell.OverflowPage != nil {
+			if cell.OverflowPage != nil {
 				panic("Unimplemented: cell has overflow page")
 			}
 
 			// This is separate here to serve as a reminder that we would in
 			// theory need to do some work to combine the cell payload with the
 			// overflow page(s)
-			cellPayload := cell.TableLeafCell.Payload
+			cellPayload := cell.Payload
 
 			record := readRecord(cellPayload)
 
