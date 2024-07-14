@@ -31,31 +31,6 @@ type BTreePage struct {
 	LeafTableCells []LeafTableCell
 }
 
-type LeafTableCell struct {
-	PayloadSize  uint64
-	RowID        uint64
-	Payload      []byte
-	OverflowPage *uint32
-}
-
-type LeafIdxCell struct {
-	LeftPage uint32
-	Key      uint64
-}
-
-type IntTableCell struct {
-	KeyPayloadSize uint64
-	Payload        []byte
-	OverflowPage   *uint32
-}
-
-type IntIdxCell struct {
-	LeftPage       uint32
-	KeyPayloadSize uint64
-	Payload        []byte
-	Key            uint64
-}
-
 // pageNum is zero indexed which may be different to the SQLite standard
 func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint32) BTreePage {
 	// Calculate the byte number in the file at which this page starts. The
@@ -111,59 +86,10 @@ func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint3
 			fmt.Println("Failed to read integer:", err)
 		}
 
-		// Between iterations of this loop, we should never hit a different case
-		// here (and if we do, something has gone wrong)
-		switch header.PageType {
-		case LEAF_TAB_PAGE:
-			page.LeafTableCells = append(page.LeafTableCells, readLeafTableCell(dbHeader, cellBytes))
-		case LEAF_IDX_PAGE:
-			page.LeafIdxCells = append(page.LeafIdxCells, readLeafIdxCell(dbHeader, cellBytes))
-		case INT_TAB_PAGE:
-			page.IntTableCells = append(page.IntTableCells, readIntTableCell(dbHeader, cellBytes))
-		case INT_IDX_PAGE:
-			page.IntIdxCells = append(page.IntIdxCells, readIntIdxCell(dbHeader, cellBytes))
-		default:
-			panic("Unknown page type")
-		}
-
+		// Appends the cell to the correct field in the page, depending on the
+		// page type
+		readCell(&page, dbHeader, cellBytes)
 	}
 
 	return page
-}
-
-func readLeafTableCell(header DatabaseHeader, data []byte) LeafTableCell {
-	var cell LeafTableCell
-
-	var offsetPayloadSize uint16
-	cell.PayloadSize, offsetPayloadSize = decodeVarInt(data[:9])
-
-	var offsetRowID uint16
-	cell.RowID, offsetRowID = decodeVarInt(data[offsetPayloadSize : offsetPayloadSize+9])
-
-	// This doesn't take into account the case where the cell overflows onto the
-	// next page (which means that the last four bytes of the cell are a pointer
-	// to the overflow page) but if we encounter this case we'll end up panicing
-	// just after this
-	cell.Payload = data[offsetPayloadSize+offsetRowID:]
-
-	// There's some somewhat complicated logic to deal with the payload
-	// overflowing onto another page. I'm not going to implement it here and
-	// instead panic if we encounter this case
-	if cell.PayloadSize > uint64(header.PageSize-uint16(header.ReservedSpace)) {
-		panic("Payload overflow")
-	}
-
-	return cell
-}
-
-func readLeafIdxCell(header DatabaseHeader, data []byte) LeafIdxCell {
-	panic("not implemented")
-}
-
-func readIntTableCell(header DatabaseHeader, data []byte) IntTableCell {
-	panic("not implemented")
-}
-
-func readIntIdxCell(header DatabaseHeader, data []byte) IntIdxCell {
-	panic("not implemented")
 }
