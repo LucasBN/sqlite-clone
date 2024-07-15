@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+
+	"github.com/xwb1989/sqlparser"
 )
 
 // Usage: sqlite3.sh sample.db .dbinfo
@@ -32,8 +34,13 @@ func main() {
 	case ".tables":
 		tables(databaseFile, header)
 	default:
-		fmt.Println("Unknown command", command)
-		os.Exit(1)
+		stmt, err := sqlparser.Parse(command)
+		if err != nil {
+			fmt.Println("Unknown command", command)
+			os.Exit(1)
+		}
+
+		Execute(stmt, databaseFile, header)
 	}
 
 }
