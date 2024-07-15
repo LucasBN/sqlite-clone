@@ -7,6 +7,8 @@ import (
 	"github.com/samber/lo"
 )
 
+type Records []Record
+
 type Record struct {
 	Entries []RecordEntry
 }
