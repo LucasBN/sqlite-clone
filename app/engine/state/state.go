@@ -7,3 +7,11 @@ type MachineState struct {
 	Registers      registers.Registers
 	Halted         bool
 }
+
+func Init() MachineState {
+	return MachineState{
+		CurrentAddress: 0,
+		Registers:      registers.Init(),
+		Halted:         false,
+	}
+}

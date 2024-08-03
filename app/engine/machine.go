@@ -2,7 +2,6 @@ package machine
 
 import (
 	"github/com/lucasbn/sqlite-clone/app/engine/instructions"
-	"github/com/lucasbn/sqlite-clone/app/engine/registers"
 	"github/com/lucasbn/sqlite-clone/app/engine/state"
 )
 
@@ -12,13 +11,9 @@ type Machine struct {
 	Output  [][]int
 }
 
-func NewMachine(instructions []instructions.Instruction) *Machine {
+func Init(instructions []instructions.Instruction) *Machine {
 	return &Machine{
-		State: state.MachineState{
-			CurrentAddress: 0,
-			Registers:      registers.Init(),
-			Halted:         false,
-		},
+		State:   state.Init(),
 		Program: instructions,
 	}
 }
