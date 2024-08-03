@@ -36,10 +36,10 @@ func readBTreePage(databaseFile *os.File, dbHeader DatabaseHeader, pageNum uint3
 	// Calculate the byte number in the file at which this page starts. The
 	// first page in the database contains the database header, which is 100
 	// bytes long
-	pageStart := int64(pageNum * uint32(dbHeader.PageSize))
+	pageStart := int64((pageNum - 1) * uint32(dbHeader.PageSize))
 
 	// Seek to the beginning of the page
-	databaseFile.Seek(lo.Ternary(pageNum == 0, pageStart+100, pageStart), io.SeekStart)
+	databaseFile.Seek(lo.Ternary(pageNum == 1, pageStart+100, pageStart), io.SeekStart)
 
 	// Read the first 12 bytes of the page into the header
 	var header BTreeHeader
