@@ -8,8 +8,8 @@ type MachineState struct {
 	Halted         bool
 }
 
-func Init() MachineState {
-	return MachineState{
+func Init() *MachineState {
+	return &MachineState{
 		CurrentAddress: 0,
 		Registers:      registers.Init(),
 		Halted:         false,

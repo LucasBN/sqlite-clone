@@ -7,10 +7,9 @@ type Integer struct {
 	Value    int
 }
 
-func (integer Integer) Execute(s state.MachineState) state.MachineState {
-	return state.MachineState{
-		CurrentAddress: s.CurrentAddress + 1,
-		Registers:      s.Registers.Set(integer.Register, integer.Value),
-		Halted:         s.Halted,
-	}
+func (integer Integer) Execute(s *state.MachineState) [][]int {
+	s.CurrentAddress++
+
+	s.Registers = s.Registers.Set(integer.Register, integer.Value)
+	return [][]int{}
 }

@@ -6,7 +6,7 @@ import (
 )
 
 type Machine struct {
-	State   state.MachineState
+	State   *state.MachineState
 	Program []instructions.Instruction
 	Output  [][]int
 }
@@ -28,7 +28,10 @@ func (m *Machine) Run() [][]int {
 		instruction := m.Program[m.State.CurrentAddress]
 
 		// Execute the instruction and update the machine state
-		m.State = instruction.Execute(m.State)
+		out := instruction.Execute(m.State)
+
+		// Append the output of the instruction to the machine output
+		m.Output = append(m.Output, out...)
 
 		// Stop the execution of the machine if the instruction resulted in a
 		// halt

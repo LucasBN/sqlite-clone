@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"github/com/lucasbn/sqlite-clone/app/machine"
+	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
 	"log"
 	"os"
 
@@ -13,27 +15,13 @@ import (
 // Usage: sqlite3.sh sample.db .dbinfo
 func main() {
 
-	instructions := []Instruction{
-		{
-			Opcode: "Integer",
-			P1:     1,
-			P2:     1,
-		},
-		{
-			Opcode: "Integer",
-			P1:     2,
-			P2:     2,
-		},
-		{
-			Opcode: "ResultRow",
-			P1:     1,
-			P2:     2,
-		},
-		{
-			Opcode: "Halt",
-		},
+	instructions := []instructions.Instruction{
+		instructions.Integer{Register: 1, Value: 1},
+		instructions.Integer{Register: 2, Value: 2},
+		instructions.ResultRow{FromRegister: 1, ToRegister: 2},
+		instructions.Halt{},
 	}
-	spew.Dump(NewMachine(instructions).Run())
+	spew.Dump(machine.Init(instructions).Run())
 
 	return
 
