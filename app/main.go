@@ -6,11 +6,37 @@ import (
 	"log"
 	"os"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/xwb1989/sqlparser"
 )
 
 // Usage: sqlite3.sh sample.db .dbinfo
 func main() {
+
+	instructions := []Instruction{
+		{
+			Opcode: "Integer",
+			P1:     1,
+			P2:     1,
+		},
+		{
+			Opcode: "Integer",
+			P1:     2,
+			P2:     2,
+		},
+		{
+			Opcode: "ResultRow",
+			P1:     1,
+			P2:     2,
+		},
+		{
+			Opcode: "Halt",
+		},
+	}
+	spew.Dump(NewMachine(instructions).Run())
+
+	return
+
 	databaseFilePath := os.Args[1]
 	command := os.Args[2]
 
