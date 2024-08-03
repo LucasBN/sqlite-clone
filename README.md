@@ -1,10 +1,4 @@
-# Architecture & Design Decisions
-
-The entry point is `main.go`, which is responsible for opening the database
-file, reading the database header and handling the execution of the command by
-handing the responsibility to another function.
-
-## Reading database tables
+# Reading the database file
 
 I've made a few design decisions related to how pages, cells and records are
 stored, as well as how tables are read.
@@ -46,7 +40,7 @@ function first calls `readBTreePage` on the root page itself, but of course the
 data of the table may be split across multiple pages - which we only find out
 after we have read the root page. After reading the root page, `readTable` will
 read all other necessary pages to create a list of 'raw records' which are
-essentially byte slices that contain *all* of the data for a record and have no
+essentially byte slices that contain _all_ of the data for a record and have no
 dependency or reference to pages. This allows us to pass the entire raw record
 to a function that is responsible for decoding the record into a useable format
 (see `record.go`).
@@ -54,11 +48,52 @@ to a function that is responsible for decoding the record into a useable format
 So far, I think this is a good structure and will allow me to (fingers crossed)
 easily add support for things like overflown cells and interior pages
 
-# Plan
+# Virtual Database Engine (VDBE)
 
-1. SQL Parser -> using a library for this
-2. Bytecode generator
-3. Bytecode engine
+I've now got my hands dirty with reading data from a simple SQLite database file
+and feel somewhat confident that I could continue down this path to flesh out
+the functionality a bit (i.e handling interior pages and supporting indexes).
+
+However, I'm going to switch my attention to a very different aspect: bytecode.
+Unlike database engines like PostgreSQL and MySQL which execute SQL by walking a
+tree of objects (similar but not the same as an AST), SQLite executes SQL by
+executing bytecode on a virtual machine.
+
+The [SQLite docs](https://www.sqlite.org/whybytecode.html) go into a lot of
+detail as to why the developers made this choice, but to briefly summarise:
+
+1. Easier to understand: linear and "atomic" instructions
+2. Easier to debug: clearer separation between frontend and backend
+3. Can be run incrementally (important since it runs locally, not on a server)
+4. Bytecode is smaller than the AST representation (important for caching)
+5. It _might_ be faster but a fair comparison is difficult
+
+### What does SQLite bytecode look like?
+
+It's really easy to see what bytecode is produced by SQLite:
+
+```bash
+$ sqlite3
+sqlite> EXPLAIN SELECT 1;
+| addr | opcode    | p1 | p2 | p3 | p4 | p5 |
+|------|-----------|----|----|----|----|----|
+| 0    | Init      | 0  | 4  | 0  | 0  | 0  | <- Jump to address 4
+| 1    | Integer   | 1  | 1  | 0  | 0  | 0  | <- Put the value 1 into register 1
+| 2    | ResultRow | 1  | 1  | 0  | 0  | 0  | <- Output the value of register 1
+| 3    | Halt      | 0  | 0  | 0  | 0  | 0  | <- Halt execution
+| 4    | Goto      | 0  | 1  | 0  | 0  | 0  | <- Jump to address 1
+```
+
+This output gives me a fairly clear idea on how to make a virtual machine
+capable of running such instructions. Since I'm more interested in the actual
+internals of a database rather than the higher level interfaces, I'm going to
+continue working "back to front" - which means that for now I'm not going to
+spend any time worrying about writing an SQL parser that generates bytecode, I'm
+just going to write a simple virtual machine that can execute a subset of the
+instructions described in the SQLite docs.
+
+### Architecture of my VBDE
+
 
 SQLite supports loads of bytecode operations - many of which I'm guessing aren't
 needed for the basic operations that I want to perform (I'm sure it's _possible_
@@ -71,13 +106,15 @@ returns the value 1.
 
 The bytecode for this SQL statement looks like this:
 
-addr  opcode         p1    p2    p3    p4             p5  comment      
-----  -------------  ----  ----  ----  -------------  --  -------------
-0     Init           0     4     0                    0   Start at 4
-1     Integer        1     1     0                    0   r[1]=1
-2     ResultRow      1     1     0                    0   output=r[1]
-3     Halt           0     0     0                    0   
-4     Goto           0     1     0                    0   
+addr opcode p1 p2 p3 p4 p5 comment
+
+---
+
+0 Init 0 4 0 0 Start at 4
+1 Integer 1 1 0 0 r[1]=1
+2 ResultRow 1 1 0 0 output=r[1]
+3 Halt 0 0 0 0
+4 Goto 0 1 0 0
 
 Each instruction always has 5 operands. I could represent an instruction like:
 
@@ -112,18 +149,32 @@ type Machine struct {
 ```
 
 ```
-addr  opcode         p1    p2    p3    p4             p5  comment      
+addr  opcode         p1    p2    p3    p4             p5  comment
 ----  -------------  ----  ----  ----  -------------  --  -------------
 0     Integer        1     1     0                    0   r[1]=1
 1     ResultRow      1     1     0                    0   output=r[1]
-2     Halt           0     0     0                    0   
+2     Halt           0     0     0                    0
 ```
 
-
 - engine
-| - instructions
+  | - instructions
   | - Instruction.go
-  |	- Halt.go
+  | - Halt.go
   | - Integer.go
   | - ResultRow.go
-| - machine.go
+  | - machine.go
+
+addr opcode p1 p2 p3 p4 p5 comment
+
+---
+
+0 Init 0 8 0 0 Start at 8
+1 OpenRead 0 2 0 2 0 root=2 iDb=0; users
+2 Rewind 0 7 0 0
+3 Column 0 0 1 0 r[1]= cursor 0 column 0
+4 Column 0 1 2 0 r[2]= cursor 0 column 1
+5 ResultRow 1 2 0 0 output=r[1..2]
+6 Next 0 3 0 1
+7 Halt 0 0 0 0
+8 Transaction 0 0 1 0 1 usesStmtJournal=0
+9 Goto 0 1 0 0
