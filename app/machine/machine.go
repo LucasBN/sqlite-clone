@@ -1,8 +1,8 @@
 package machine
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/engine/instructions"
-	"github/com/lucasbn/sqlite-clone/app/engine/state"
+	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
+	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
 type Machine struct {

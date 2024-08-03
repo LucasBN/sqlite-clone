@@ -1,6 +1,6 @@
 package state
 
-import "github/com/lucasbn/sqlite-clone/app/engine/registers"
+import "github/com/lucasbn/sqlite-clone/app/machine/registers"
 
 type MachineState struct {
 	CurrentAddress int
