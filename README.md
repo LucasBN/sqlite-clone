@@ -53,3 +53,77 @@ to a function that is responsible for decoding the record into a useable format
 
 So far, I think this is a good structure and will allow me to (fingers crossed)
 easily add support for things like overflown cells and interior pages
+
+# Plan
+
+1. SQL Parser -> using a library for this
+2. Bytecode generator
+3. Bytecode engine
+
+SQLite supports loads of bytecode operations - many of which I'm guessing aren't
+needed for the basic operations that I want to perform (I'm sure it's _possible_
+to even do very advanced operations with a very small subset of these as well).
+
+I think the best way to build this is to choose a very small subset of
+operations which would allow me to execute very basic SQL statements, end to
+end. The most simple SQL statement that I can think of is `SELECT 1;` which just
+returns the value 1.
+
+The bytecode for this SQL statement looks like this:
+
+addr  opcode         p1    p2    p3    p4             p5  comment      
+----  -------------  ----  ----  ----  -------------  --  -------------
+0     Init           0     4     0                    0   Start at 4
+1     Integer        1     1     0                    0   r[1]=1
+2     ResultRow      1     1     0                    0   output=r[1]
+3     Halt           0     0     0                    0   
+4     Goto           0     1     0                    0   
+
+Each instruction always has 5 operands. I could represent an instruction like:
+
+```
+type Instruction struct {
+	Opcode String
+	P1	   int
+	P2	   int
+	P3	   int
+	P4	   int
+	P5	   int
+}
+```
+
+Ideally with something more like an Enum for the Opcode.
+
+```
+var instructions []Instruction
+
+for _, instruction := range instructions {
+	machine = machine.Execute(instruction)
+}
+
+
+```
+
+```
+type Machine struct {
+	Registers map[int]([]byte)
+	Out		  ____
+}
+```
+
+```
+addr  opcode         p1    p2    p3    p4             p5  comment      
+----  -------------  ----  ----  ----  -------------  --  -------------
+0     Integer        1     1     0                    0   r[1]=1
+1     ResultRow      1     1     0                    0   output=r[1]
+2     Halt           0     0     0                    0   
+```
+
+
+- engine
+| - instructions
+  | - Instruction.go
+  |	- Halt.go
+  | - Integer.go
+  | - ResultRow.go
+| - machine.go
