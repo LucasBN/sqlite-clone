@@ -72,7 +72,7 @@ detail as to why the developers made this choice, but to briefly summarise:
 
 It's really easy to see what bytecode is produced by SQLite:
 
-```bash
+```
 $ sqlite3
 sqlite> EXPLAIN SELECT 1;
 | addr | opcode    | p1 | p2 | p3 | p4 | p5 |
@@ -92,89 +92,62 @@ spend any time worrying about writing an SQL parser that generates bytecode, I'm
 just going to write a simple virtual machine that can execute a subset of the
 instructions described in the SQLite docs.
 
-### Architecture of my VBDE
+### Architecture of my VDBE
 
-
-SQLite supports loads of bytecode operations - many of which I'm guessing aren't
-needed for the basic operations that I want to perform (I'm sure it's _possible_
-to even do very advanced operations with a very small subset of these as well).
-
-I think the best way to build this is to choose a very small subset of
-operations which would allow me to execute very basic SQL statements, end to
-end. The most simple SQL statement that I can think of is `SELECT 1;` which just
-returns the value 1.
-
-The bytecode for this SQL statement looks like this:
-
-addr opcode p1 p2 p3 p4 p5 comment
-
----
-
-0 Init 0 4 0 0 Start at 4
-1 Integer 1 1 0 0 r[1]=1
-2 ResultRow 1 1 0 0 output=r[1]
-3 Halt 0 0 0 0
-4 Goto 0 1 0 0
-
-Each instruction always has 5 operands. I could represent an instruction like:
+I'm unsure about my initial implementation (I don't know if it's "efficient" or
+not - and I don't know if that really even matters?), but the directory
+structure looks like:
 
 ```
-type Instruction struct {
-	Opcode String
-	P1	   int
-	P2	   int
-	P3	   int
-	P4	   int
-	P5	   int
+machine
+|-- instructions
+|    +-- instruction.go
+|    +-- integer.go
+|    +-- halt.go
+|    +-- result_row.go
+|-- registers
+|    +-- register.go
+|-- state
+|    +-- state.go
++-- machine.go
+```
+
+I've also created a few data types (structs) to represent the machine:
+
+1. Machine: machine state, the program and the output buffer
+2. State: current address, registers, halted
+3. RegisterFile: map from int to int
+4. Instruction: interface with an execute function
+
+The purpose of creating these abstractions was to get to a point where I could
+extend the capabilities of the VM by only having to define the execute function
+on new instructions.
+
+A 'Machine' has a `Run()` function on it which repeatedly calls execute on the
+instruction at the current address (instruction pointer) until the halt state is
+reached. Each call to `Execute` is passed a pointer to the current machine
+state, and updates the state according to the instructions specification.
+
+The `State` is not directly embedded in the `Machine` struct because the state
+is relevant to instructions (and is therefore imported by the instructions
+package), but the other fields on the machine (output and program) are not
+relevant to execution of a single instruction (and therefore don't need to be
+accessible / imported). This enforces a separation of concerns (and avoids
+import cycles).
+
+The following instructions are sufficient to execute bytecode that represents
+the query `SELECT 1, 2;`:
+
+```go
+instructions := []instructions.Instruction{
+	instructions.Integer{Register: 1, Value: 1},
+	instructions.Integer{Register: 2, Value: 2},
+	instructions.ResultRow{FromRegister: 1, ToRegister: 2},
+	instructions.Halt{},
 }
+m := machine.Init(instructions)
+output := m.Run()
 ```
 
-Ideally with something more like an Enum for the Opcode.
-
-```
-var instructions []Instruction
-
-for _, instruction := range instructions {
-	machine = machine.Execute(instruction)
-}
-
-
-```
-
-```
-type Machine struct {
-	Registers map[int]([]byte)
-	Out		  ____
-}
-```
-
-```
-addr  opcode         p1    p2    p3    p4             p5  comment
-----  -------------  ----  ----  ----  -------------  --  -------------
-0     Integer        1     1     0                    0   r[1]=1
-1     ResultRow      1     1     0                    0   output=r[1]
-2     Halt           0     0     0                    0
-```
-
-- engine
-  | - instructions
-  | - Instruction.go
-  | - Halt.go
-  | - Integer.go
-  | - ResultRow.go
-  | - machine.go
-
-addr opcode p1 p2 p3 p4 p5 comment
-
----
-
-0 Init 0 8 0 0 Start at 8
-1 OpenRead 0 2 0 2 0 root=2 iDb=0; users
-2 Rewind 0 7 0 0
-3 Column 0 0 1 0 r[1]= cursor 0 column 0
-4 Column 0 1 2 0 r[2]= cursor 0 column 1
-5 ResultRow 1 2 0 0 output=r[1..2]
-6 Next 0 3 0 1
-7 Halt 0 0 0 0
-8 Transaction 0 0 1 0 1 usesStmtJournal=0
-9 Goto 0 1 0 0
+This is cool and lays down the foundations for a VDBE - we now need to implement
+instructions that are able to interact with the database file!
