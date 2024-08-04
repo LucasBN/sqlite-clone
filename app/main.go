@@ -3,14 +3,28 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"github/com/lucasbn/sqlite-clone/app/machine"
+	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
 	"log"
 	"os"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/xwb1989/sqlparser"
 )
 
 // Usage: sqlite3.sh sample.db .dbinfo
 func main() {
+
+	instructions := []instructions.Instruction{
+		instructions.Integer{Register: 1, Value: 1},
+		instructions.Integer{Register: 2, Value: 2},
+		instructions.ResultRow{FromRegister: 1, ToRegister: 2},
+		instructions.Halt{},
+	}
+	spew.Dump(machine.Init(instructions).Run())
+
+	return
+
 	databaseFilePath := os.Args[1]
 	command := os.Args[2]
 
