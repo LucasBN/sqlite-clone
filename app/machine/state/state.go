@@ -4,7 +4,7 @@ import "github/com/lucasbn/sqlite-clone/app/machine/registers"
 
 type MachineState struct {
 	CurrentAddress int
-	Registers      registers.Registers
+	Registers      registers.RegisterFile
 	Halted         bool
 }
 
