@@ -1,77 +1,68 @@
 package main
 
 import (
-	"encoding/binary"
-	"fmt"
+	"github/com/lucasbn/sqlite-clone/app/generator"
 	"github/com/lucasbn/sqlite-clone/app/machine"
-	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
-	"log"
+	"github/com/lucasbn/sqlite-clone/app/parser"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/xwb1989/sqlparser"
 )
 
-// Usage: sqlite3.sh sample.db .dbinfo
+// Usage:
+// - sqlite3.sh sample.db .dbinfo
+// - sqlite3.sh sample.db "SELECT * FROM users;"
+//
+// This is really just a temporary entry point into the system. In the future we
+// could add support for some sort of REPL... but that's not really the point of
+// doing this project so I'll leave that for a rainy day.
 func main() {
-
-	instructions := []instructions.Instruction{
-		instructions.Integer{Register: 1, Value: 1},
-		instructions.Integer{Register: 2, Value: 2},
-		instructions.ResultRow{FromRegister: 1, ToRegister: 2},
-		instructions.Halt{},
-	}
-	spew.Dump(machine.Init(instructions).Run())
-
-	return
-
-	databaseFilePath := os.Args[1]
+	dbFilePath := os.Args[1]
 	command := os.Args[2]
 
-	// Open the database file and defer its closing
-	databaseFile, err := os.Open(databaseFilePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer databaseFile.Close()
+	// 1. Parse the SQL string
+	stmt := parser.MustParse(command)
 
-	// Read the database header
-	var header DatabaseHeader
-	if err := binary.Read(databaseFile, binary.BigEndian, &header); err != nil {
-		fmt.Println("Failed to read integer:", err)
-		return
-	}
+	// 2. Generate the bytecode
+	instructions := generator.Generate(stmt)
 
-	switch command {
-	case ".dbinfo":
-		dbinfo(databaseFile, header)
-	case ".tables":
-		tables(databaseFile, header)
-	default:
-		stmt, err := sqlparser.Parse(command)
-		if err != nil {
-			fmt.Println("Unknown command", command)
-			os.Exit(1)
-		}
+	// 3. Configure the virtual machine
+	m := machine.Init(machine.MachineConfig{
+		Instructions: instructions,
+		DBFilePath:   dbFilePath,
+	})
 
-		Execute(stmt, databaseFile, header)
-	}
+	// 4. Execute the program
+	result := m.Run()
 
+	// 5. Pretty print the result
+	spew.Dump(result)
 }
 
-func dbinfo(databaseFile *os.File, header DatabaseHeader) {
-	schema := readSQLiteSchema(databaseFile, header)
+// Old code that I may use someday:
+// ----------------------------------------------------------
+// databaseFilePath := os.Args[1]
+// command := os.Args[2]
 
-	fmt.Printf("database page size: %v\n", header.PageSize)
-	fmt.Printf("number of tables: %v\n", schema.TableCount())
-}
+// // Open the database file and defer its closing
+// databaseFile, err := os.Open(databaseFilePath)
+// if err != nil {
+// 	log.Fatal(err)
+// }
+// defer databaseFile.Close()
 
-func tables(databaseFile *os.File, header DatabaseHeader) {
-	schema := readSQLiteSchema(databaseFile, header)
+// // Read the database header
+// var header DatabaseHeader
+// if err := binary.Read(databaseFile, binary.BigEndian, &header); err != nil {
+// 	fmt.Println("Failed to read integer:", err)
+// 	return
+// }
 
-	for _, row := range schema.Rows {
-		if row.Type == "table" && row.Name != "sqlite_sequence" {
-			fmt.Println(row.Name)
-		}
-	}
-}
+// switch command {
+// case ".dbinfo":
+// 	dbinfo(databaseFile, header)
+// case ".tables":
+// 	tables(databaseFile, header)
+// default:
+// 	break
+// }

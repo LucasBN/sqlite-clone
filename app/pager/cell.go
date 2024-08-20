@@ -1,4 +1,4 @@
-package main
+package pager
 
 type LeafTableCell struct {
 	PayloadSize  uint64

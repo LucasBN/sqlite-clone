@@ -6,15 +6,22 @@ import (
 )
 
 type Machine struct {
-	State   *state.MachineState
-	Program []instructions.Instruction
-	Output  [][]int
+	DBFilePath string
+	State      *state.MachineState
+	Program    []instructions.Instruction
+	Output     [][]int
 }
 
-func Init(instructions []instructions.Instruction) *Machine {
+type MachineConfig struct {
+	DBFilePath   string
+	Instructions []instructions.Instruction
+}
+
+func Init(config MachineConfig) *Machine {
 	return &Machine{
-		State:   state.Init(),
-		Program: instructions,
+		DBFilePath: config.DBFilePath,
+		State:      state.Init(),
+		Program:    config.Instructions,
 	}
 }
 
