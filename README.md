@@ -151,3 +151,57 @@ output := m.Run()
 
 This is cool and lays down the foundations for a VDBE - we now need to implement
 instructions that are able to interact with the database file!
+
+Let's take a look at the output of `EXPLAIN SELECT * FROM users;`:
+
+```
+| addr | opcode     | p1 | p2 | p3 | p4 | p5 |
+|------|------------|----|----|----|----|----|
+| 0    | Init       | 0  | 8  | 0  | 0  | 0  |
+| 1    | OpenRead   | 0  | 2  | 0  | 2  | 0  |
+| 2    | Rewind     | 0  | 7  | 0  | 0  | 0  |
+| 3    |  Column    | 0  | 0  | 1  | 0  | 0  |
+| 4    |  Column    | 0  | 1  | 2  | 0  | 0  |
+| 5    |  ResultRow | 1  | 2  | 0  | 0  | 0  |
+| 6    | Next       | 0  | 3  | 0  | 0  | 1  |
+| 7    | Halt       | 0  | 0  | 0  | 0  | 0  |
+| 8    | Transation | 0  | 0  | 1  | 0  | 0  |
+| 9    | Goto       | 0  | 1  | 0  | 0  | 0  |
+```
+
+We have already implemented the `Halt` and `ResultRow` instructions, and for now
+we can ignore the `Init`, `Goto`, and `Transation` instructions since the code
+above is equivalent to:
+
+```
+| addr | opcode     | p1 | p2 | p3 | p4 | p5 |
+|------|------------|----|----|----|----|----|
+| 0    | OpenRead   | 0  | 2  | 0  | 2  | 0  |
+| 1    | Rewind     | 0  | 7  | 0  | 0  | 0  |
+| 2    |  Column    | 0  | 0  | 1  | 0  | 0  |
+| 3    |  Column    | 0  | 1  | 2  | 0  | 0  |
+| 4    |  ResultRow | 1  | 2  | 0  | 0  | 0  |
+| 5    | Next       | 0  | 2  | 0  | 0  | 1  |
+| 6    | Halt       | 0  | 0  | 0  | 0  | 0  |
+```
+
+Which means we need to implement the `OpenRead`, `Rewind`, `Column` and `Next`
+instructions.
+
+**OpenRead**:
+
+- Open a read-only cursor for the database table whose root page is P2 in a
+  database file
+- P3 determines the database file, but for simplicity I'll ignore this operand
+  and default to the main database file
+- P1 is the identifier of the cursor (small positive integer)
+- In the case of a table b-tree, P4 is no less than the number of columns in the
+  table. For simplicity, we won't yet handle the index b-tree case.
+
+**Rewind**:
+
+
+
+**Column**:
+
+**Next**:
