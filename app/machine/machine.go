@@ -1,15 +1,16 @@
 package machine
 
 import (
+	"github/com/lucasbn/sqlite-clone/app/btree"
 	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
 type Machine struct {
-	DBFilePath string
-	State      *state.MachineState
-	Program    []instructions.Instruction
-	Output     [][]int
+	BTreeProcessor *btree.BTreeProcessor
+	State          *state.MachineState
+	Program        []instructions.Instruction
+	Output         [][]int
 }
 
 type MachineConfig struct {
@@ -19,9 +20,9 @@ type MachineConfig struct {
 
 func Init(config MachineConfig) *Machine {
 	return &Machine{
-		DBFilePath: config.DBFilePath,
-		State:      state.Init(),
-		Program:    config.Instructions,
+		BTreeProcessor: btree.Init(config.DBFilePath),
+		State:          state.Init(),
+		Program:        config.Instructions,
 	}
 }
 
