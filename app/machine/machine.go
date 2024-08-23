@@ -36,7 +36,7 @@ func (m *Machine) Run() [][]int {
 		instruction := m.Program[m.State.CurrentAddress]
 
 		// Execute the instruction and update the machine state
-		out := instruction.Execute(m.State)
+		out := instruction.Execute(m.State, m.BTreeProcessor)
 
 		// Append the output of the instruction to the machine output
 		m.Output = append(m.Output, out...)

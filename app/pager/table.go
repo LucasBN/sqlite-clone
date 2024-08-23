@@ -40,7 +40,7 @@ func readTable(databaseFile *os.File, dbHeader DatabaseHeader, rootPage uint32) 
 	// Decode the raw records into actual records
 	var records []Record
 	for _, rawRecord := range rawRecords {
-		records = append(records, readRecord(rawRecord))
+		records = append(records, ReadRecord(rawRecord))
 	}
 
 	return records

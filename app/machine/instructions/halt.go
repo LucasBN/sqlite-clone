@@ -1,10 +1,15 @@
 package instructions
 
-import "github/com/lucasbn/sqlite-clone/app/machine/state"
+import (
+	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/state"
+)
 
 type Halt struct{}
 
-func (Halt) Execute(s *state.MachineState) [][]int {
+var _ Instruction = Halt{}
+
+func (Halt) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
 	s.Halted = true
 	return [][]int{}
 }
