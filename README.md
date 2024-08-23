@@ -200,8 +200,8 @@ instructions.
 
 **Rewind**:
 
-
-
 **Column**:
 
 **Next**:
+
+![alt text](images/architecture.png "Architecture")
