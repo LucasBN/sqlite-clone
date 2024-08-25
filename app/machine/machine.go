@@ -1,13 +1,13 @@
 package machine
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
 type Machine struct {
-	BTreeEngine btree.BTreeEngine
+	BTreeEngine common.BTreeEngine
 	State       *state.MachineState
 	Program     []instructions.Instruction
 	Output      [][]int
@@ -15,7 +15,7 @@ type Machine struct {
 
 type MachineConfig struct {
 	Instructions []instructions.Instruction
-	BTreeEngine  btree.BTreeEngine
+	BTreeEngine  common.BTreeEngine
 }
 
 func Init(config MachineConfig) *Machine {

@@ -1,7 +1,7 @@
 package instructions
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
@@ -12,7 +12,7 @@ type Integer struct {
 
 var _ Instruction = Integer{}
 
-func (integer Integer) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
+func (integer Integer) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
 	s.Registers = s.Registers.Set(integer.Register, integer.Value)

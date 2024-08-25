@@ -41,14 +41,20 @@ func main() {
 	}
 
 	// Initialise a pager and defer closing it
-	simplePager, err := pagerpkg.NewSimplePager(dbFilePath, uint64(header.PageSize), uint64(header.ReservedSpace))
+	pager, err := pagerpkg.NewPager(
+		dbFilePath,
+		pagerpkg.PagerConfig{
+			PageSize:      uint64(header.PageSize),
+			ReservedSpace: uint64(header.ReservedSpace),
+		},
+	)
 	if err != nil {
 		panic(err)
 	}
-	defer simplePager.Close()
+	defer pager.Close()
 
 	// Initialise a BTreeEngine
-	simpleBTreeEngine, err := btreepkg.NewSimpleBTreeEngine(simplePager)
+	bTreeEngine, err := btreepkg.NewBTreeEngine(pager)
 	if err != nil {
 		panic(err)
 	}
@@ -60,10 +66,12 @@ func main() {
 	instructions := generator.Generate(stmt)
 
 	// 3. Configure the virtual machine
-	m := machine.Init(machine.MachineConfig{
-		Instructions: instructions,
-		BTreeEngine:  simpleBTreeEngine,
-	})
+	m := machine.Init(
+		machine.MachineConfig{
+			Instructions: instructions,
+			BTreeEngine:  bTreeEngine,
+		},
+	)
 
 	// 4. Execute the program
 	result := m.Run()

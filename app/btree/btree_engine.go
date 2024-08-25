@@ -1,89 +1,307 @@
 package btree
 
-// A BTreeEngine provides a cursor based interface that allows callers to walk
-// through a B-Tree and read the entries stored in it.
-type BTreeEngine interface {
-	NewCursor(id uint64, rootPageNum uint64) (bool, error)
-	RewindCursor(id uint64) (bool, error)
-	AdvanceCursor(id uint64) (bool, error)
-	ReadColumn(id uint64, column uint64) (BTreeEntry, error)
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"github/com/lucasbn/sqlite-clone/app/types"
+
+	"github.com/samber/lo"
+)
+
+type Pager interface {
+	Close() error
+	PageSize() uint64
+	ReservedSpace() uint64
+	GetPage(pageNum uint64) ([]byte, error)
 }
 
-// BTreeEntry allows us to represent the different types of entries that can be
-// stored in a B-Tree. We have three types of entries: null, number, and text.
-//
-// The caller can use the Type method to determine the type of the entry:
-//
-// var entry RecordEntry
-// entry = NumberEntry{Value: 12345}
-//
-// switch v := entry.(type) {
-// ...
-// }
-//
-// It might be useful at some point in the future to add methods to this
-// interface.
-type BTreeEntry interface{}
-
-type BTreeNullEntry struct{}
-
-type BTreeNumberEntry struct {
-	Value uint64
+type BTreeEngine struct {
+	Pager   Pager
+	Cursors map[uint64]*cursor
 }
 
-type BTreeTextEntry struct {
-	Value string
+func NewBTreeEngine(pager Pager) (*BTreeEngine, error) {
+	return &BTreeEngine{
+		Pager:   pager,
+		Cursors: make(map[uint64]*cursor),
+	}, nil
 }
 
-var _ BTreeEntry = &BTreeNullEntry{}
-var _ BTreeEntry = &BTreeNumberEntry{}
-var _ BTreeEntry = &BTreeTextEntry{}
+// NewCursor creates a new cursor with the given ID that points to the table or
+// index at the given root page number. The cursor is initialized to point at
+// the very beginning of the root page.
+func (b *BTreeEngine) NewCursor(id uint64, rootPageNum uint64) (bool, error) {
+	// Check if a cursor with the given ID already exists
+	if _, ok := b.Cursors[id]; ok {
+		return false, errors.New("cursor with the given ID already exists")
+	}
 
-// A cursor points to a specific entry in a b-tree, which means that it points
-// to a specific byte offset in the database.
-//
-// Currently, a cursor makes a very incorrect assumption that every page is a
-// leaf table page (no indexes, no interior pages). This means that we only need
-// to store the absolute byte offset within a database file that the cursor is
-// pointing to.
-//
-// Adding support for interior pages might require us to store more information,
-// as we'll probably need a way to jump from one page to another.
-//
-// Cursors also assume that the caller 'knows' what they're doing, and therefore
-// do not try to protect against 'invalid' operations. For example, if the
-// caller attempts to call ReadColumn on a cursor that isn't actually pointing
-// to a valid record, the cursor will read the bytes at the current position and
-// interpret them as a record (and get the column data from it). However, errors
-// may still occur if the cursor attempts, for example, to read past the end of
-// the page.
-type cursor struct {
-	// The ID of the cursor
-	ID uint64
+	// Create a new cursor and add it to the map of cursors
+	b.Cursors[id] = &cursor{
+		ID:          id,
+		Position:    0,
+		CurrentPage: rootPageNum,
+		RootPage:    rootPageNum,
+	}
 
-	// The byte offset of the cursor on the current page
-	Position uint64
-
-	// The cell number of the cell that the cursor is currently pointing to
-	CurrentCell *uint64
-
-	// The page number of the page that the cursor is currently pointing to
-	CurrentPage uint64
-
-	// The page number of the root page of the B-Tree
-	RootPage uint64
+	return true, nil
 }
 
-const INT_IDX_PAGE = 2
-const INT_TAB_PAGE = 5
-const LEAF_IDX_PAGE = 10
-const LEAF_TAB_PAGE = 13
+// RewindCusor moves the cursor to the first entry in the database table or
+// index.
+func (b *BTreeEngine) RewindCursor(id uint64) (bool, error) {
+	// Get the cursor with the given ID
+	cursor, err := b.getCursor(id)
+	if err != nil {
+		return false, err
+	}
 
-type bTreeHeader struct {
-	PageType                uint8
-	FirstFreeBlock          uint16
-	NumCells                uint16
-	CellContentOffset       uint16
-	NumFragmenttedFreeBytes uint8
-	RightMostPointer        uint32
+	// The first cell in the page is cell zero
+	var firstCellNumber uint64 = 0
+
+	// Get the position of the first cell in the root page
+	newPosition, ok, err := b.getCellPointer(firstCellNumber, cursor.RootPage)
+	if err != nil || !ok {
+		return false, err
+	}
+
+	// Set the position of the cursor to be the byte offset of the first cell
+	cursor.Position = *newPosition
+
+	// Set the current cell of the cursor to be the first cell
+	cursor.CurrentCell = &firstCellNumber
+
+	return true, nil
+}
+
+// AdvanceCursor moves the cursor to the next leaf cell in the database table or
+// index.
+func (b *BTreeEngine) AdvanceCursor(id uint64) (bool, error) {
+	// Get the cursor with the given ID
+	cursor, err := b.getCursor(id)
+	if err != nil {
+		return false, err
+	}
+
+	var newCellNumber uint64 = *cursor.CurrentCell + 1
+
+	// Get the position of the next cell in the cyrrent page
+	newPosition, didAdvance, err := b.getCellPointer(newCellNumber, cursor.CurrentPage)
+	if err != nil || !didAdvance {
+		return false, err
+	}
+
+	// Set the position of the cursor to be the byte offset of the first cell
+	cursor.Position = *newPosition
+
+	// Set the current cell of the cursor to be the first cell
+	cursor.CurrentCell = &newCellNumber
+
+	return true, nil
+}
+
+func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) {
+	// Get the cursor with the given ID
+	cursor, err := b.getCursor(id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the page of the table or index
+	page, err := b.Pager.GetPage(cursor.CurrentPage)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the byte offset at which the cell ends
+	var cellEnd uint64
+	if *cursor.CurrentCell == 0 {
+		// If the current cell is the first cell in the page, the cell end is
+		// the end of the page minus the reserved space
+		cellEnd = b.Pager.PageSize() - b.Pager.ReservedSpace()
+	} else {
+		// Otherwise, the cell end is the start of the previous cell
+		nextCell, ok, err := b.getCellPointer(*cursor.CurrentCell-1, cursor.CurrentPage)
+		if err != nil || !ok {
+			return nil, err
+		}
+		cellEnd = *nextCell
+	}
+
+	// Read the cell data from the page
+	cell := page[cursor.Position:cellEnd]
+
+	// We'll start at the beginning of the cell and keep a pointer to keep track
+	// of our position within the cell
+	var pointer uint64 = 0
+
+	// Read payload size from the cell - a varint could be up to 9 bytes long,
+	// we'll need to read at most 9 bytes
+	payloadSize, offset := decodeVarInt(cell[pointer:lo.Min([]int{len(cell) - 1, 9})])
+	pointer += uint64(offset)
+
+	// There's some somewhat complicated logic to deal with the payload
+	// overflowing onto another page. I'm not going to implement it here and
+	// instead panic if we encounter this case
+	if payloadSize > uint64(b.Pager.PageSize()-b.Pager.ReservedSpace()) {
+		return nil, errors.New("unsupported: payload overflows onto another page")
+	}
+
+	// Read the row ID from the cell
+	_, offset = decodeVarInt(cell[pointer:lo.Min([]int{len(cell) - int(offset) - 1, 9})])
+	pointer += uint64(offset)
+
+	// Read the record header size
+	recordHeaderSize, offset := decodeVarInt(cell[pointer:])
+	pointer += uint64(offset)
+
+	// Read the type codes from the record header
+	var typeCodes []uint64
+	{
+		// Read the record header
+		recordHeaderEnd := pointer + recordHeaderSize - uint64(offset)
+
+		for {
+			typeCode, offset := decodeVarInt(cell[pointer:])
+			typeCodes = append(typeCodes, typeCode)
+
+			pointer += uint64(offset)
+			if pointer >= recordHeaderEnd {
+				break
+			}
+		}
+	}
+
+	// Read the column from the record data
+	intTypeCodeToSize := map[uint64]uint64{
+		1: 1,
+		2: 2,
+		3: 3,
+		4: 4,
+		5: 6,
+		6: 8,
+	}
+
+	for idx, typeCode := range typeCodes {
+		var entry types.Entry
+		if typeCode == 0 {
+			entry = types.NullEntry{}
+		} else if typeCode >= 1 && typeCode <= 6 {
+			// Make an 8 byte empty slice
+			result := make([]byte, 8)
+
+			// Extract the correct number of bytes from the raw record
+			size := intTypeCodeToSize[typeCode]
+			value := cell[pointer : pointer+size]
+			pointer += size
+
+			// Copy the bytes into the result slice so that we can decode them
+			// as a uint64
+			for i := 7; 7-i < len(value); i-- {
+				result[i] = value[7-i]
+			}
+
+			entry = types.NumberEntry{Value: binary.BigEndian.Uint64(result)}
+		} else if typeCode == 8 {
+			entry = types.NumberEntry{Value: 0}
+		} else if typeCode == 9 {
+			entry = types.NumberEntry{Value: 1}
+		} else if typeCode >= 12 && typeCode%2 == 1 {
+			length := (typeCode - 12) / 2
+			entry = types.TextEntry{Value: string(cell[pointer : pointer+length])}
+			pointer += length
+		} else {
+			return nil, errors.New("unsupported type code: not implemented")
+		}
+
+		if uint64(idx) == column {
+			// This is the entry we want, so read
+			return entry, nil
+		}
+	}
+
+	// If the column wasn't found, return a null entry
+	return types.NullEntry{}, nil
+}
+
+func (b *BTreeEngine) getCursor(id uint64) (*cursor, error) {
+	cursor, ok := b.Cursors[id]
+	if !ok {
+		return nil, errors.New("cursor with the given ID does not exist")
+	}
+
+	return cursor, nil
+}
+
+func (b *BTreeEngine) getCellPointer(cellNum uint64, pageNum uint64) (*uint64, bool, error) {
+	// Get the page of the table or index
+	page, err := b.Pager.GetPage(pageNum)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// We'll start at the beginning of the page and read the BTreeHeader to find
+	// the position of the first leaf cell
+	var pointer uint64 = 0
+
+	// If we're on the very first page, we need to skip the database header
+	if pageNum == 1 {
+		pointer += 100
+	}
+
+	// Read the BTreeHeader
+	var header bTreeHeader
+	err = binary.Read(bytes.NewBuffer(page[pointer:pointer+12]), binary.BigEndian, &header)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Check if the cell number is out of bounds and return false as the 'ok' parameter
+	if uint64(header.NumCells) <= cellNum {
+		return nil, false, nil
+	}
+
+	// Advance the pointer 12 bytes to skip over the BTreeHeader
+	pointer += 12
+
+	// We only support leaf table pages for now, so return an error if the page
+	// is anything else
+	if header.PageType != LEAF_TAB_PAGE {
+		return nil, false, errors.New("cursor only supports leaf table pages")
+	}
+
+	// Move back 4 bytes if we're not in an interior page because we don't store
+	// the right most pointer in the header for leaf pages
+	if header.PageType != INT_TAB_PAGE && header.PageType != INT_IDX_PAGE {
+		pointer -= 4
+	}
+
+	// Get the first entry of the cell pointer array, which starts immediately
+	// after the B-Tree header and consists of 2-byte unsigned integers
+	var cellPointer uint16
+	cellPointerStart := pointer + (2 * cellNum)
+	err = binary.Read(bytes.NewBuffer(page[cellPointerStart:cellPointerStart+2]), binary.BigEndian, &cellPointer)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// Cast the cell pointer to a uint64
+	var cellPointer64 uint64 = uint64(cellPointer)
+
+	return &cellPointer64, true, nil
+}
+
+// A varint consists of either zero or more bytes which have the high-order
+// bit set followed by a single byte with the high-order bit clear, or nine
+// bytes, whichever is shorter.
+func decodeVarInt(data []byte) (uint64, uint16) {
+	var value uint64
+	for i := 0; i < 8; i++ {
+		value = (value << 7) | uint64(data[i]&0x7F)
+		if data[i]&0x80 == 0 {
+			return value, uint16(i + 1)
+		}
+	}
+	return value<<8 | uint64(data[8]), 9
 }

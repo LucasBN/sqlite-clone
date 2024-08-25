@@ -1,7 +1,7 @@
 package instructions
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
@@ -12,10 +12,10 @@ type OpenRead struct {
 
 var _ Instruction = OpenRead{}
 
-func (openRead OpenRead) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
+func (openRead OpenRead) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
-	p.NewCursor(openRead.CursorID, openRead.RootPage)
+	b.NewCursor(openRead.CursorID, openRead.RootPage)
 
 	return [][]int{}
 }

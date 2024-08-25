@@ -1,8 +1,9 @@
 package instructions
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
+	"github/com/lucasbn/sqlite-clone/app/types"
 )
 
 type Column struct {
@@ -13,17 +14,17 @@ type Column struct {
 
 var _ Instruction = Column{}
 
-func (column Column) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
+func (column Column) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
-	entry, err := p.ReadColumn(column.Cursor, column.Column)
+	entry, err := b.ReadColumn(column.Cursor, column.Column)
 	if err != nil {
 		panic(err)
 	}
 
-	switch entry.(type) {
-	case btree.BTreeNumberEntry:
-		s.Registers = s.Registers.Set(column.Register, int(entry.(btree.BTreeNumberEntry).Value))
+	switch e := entry.(type) {
+	case types.NumberEntry:
+		s.Registers = s.Registers.Set(column.Register, int(e.Value))
 	default:
 		panic("Unknown entry type")
 	}

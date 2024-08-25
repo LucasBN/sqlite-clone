@@ -1,7 +1,7 @@
 package instructions
 
 import (
-	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
@@ -12,8 +12,8 @@ type Next struct {
 
 var _ Instruction = Next{}
 
-func (next Next) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
-	didAdvance, err := p.AdvanceCursor(next.Cursor)
+func (next Next) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+	didAdvance, err := b.AdvanceCursor(next.Cursor)
 	if err != nil {
 		panic(err)
 	}
