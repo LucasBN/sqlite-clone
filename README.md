@@ -37,9 +37,46 @@ to another layer.
 This means that layers are decoupled, and don't really on the implementation
 details of any other layers.
 
+In the future, I'd like to potentially create different implementations of some
+layers and figure out a way to profile them (i.e compare CPU and memory usage).
+
 ### Layer 1: Pager
 
-TODO
+The pager is responsible for efficiently reading and writing pages to/from a file,
+and is not concerned with things like:
+
+1. The contents of a page
+2. The format of the file
+3. The 'context' of the file (e.g a database)
+
+It could be used as an interface for interacting with _any_ page-based file, and
+conforms to the following interface:
+
+```go
+type Pager interface {
+    Close() error
+    PageSize() uint64
+    ReservedSpace() uint64
+    GetPage(pageNum uint64) ([]byte, error)
+}
+```
+
+It can be instantied with the following constructor:
+
+```go
+func NewPager(filepath string, config PagerConfig) (*Pager, error)
+```
+
+where the `config` contains the page size and the number of reserved bytes at the
+end of each page.
+
+The pager has a cache, which is implemented as a hash map that relates page
+numbers to a byte slice (which is the length of a page).
+
+There's likely a huge number of optimisations that could be done here, and I'm
+deliberately doing none of them now (other than the very simple cache described
+above) because my primary aim is to get an end-to-end simple, extensible and
+functional system.
 
 ### Layer 2: BTreeEngine
 
