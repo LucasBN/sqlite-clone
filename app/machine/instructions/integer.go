@@ -12,7 +12,7 @@ type Integer struct {
 
 var _ Instruction = Integer{}
 
-func (integer Integer) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
+func (integer Integer) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
 	s.Registers = s.Registers.Set(integer.Register, integer.Value)

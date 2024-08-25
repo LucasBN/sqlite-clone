@@ -9,7 +9,7 @@ type Halt struct{}
 
 var _ Instruction = Halt{}
 
-func (Halt) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
+func (Halt) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
 	s.Halted = true
 	return [][]int{}
 }

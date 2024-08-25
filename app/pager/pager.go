@@ -1,40 +1,17 @@
 package pager
 
-import (
-	"encoding/binary"
-	"log"
-	"os"
-)
-
-type Pager struct {
-	File     *os.File
-	DBHeader DatabaseHeader
-	Cache    map[uint32]BTreePage
+// A `Pager` is responsible for reading and writing pages to and from the disk.
+type Pager interface {
+	Close() error
+	PageSize() uint64
+	ReservedSpace() uint64
+	GetPage(pageNum uint64) (*Page, error)
 }
 
-func Init(filepath string) *Pager {
-	databaseFile, err := os.Open(filepath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// defer databaseFile.Close()
+type Page struct {
+	// The raw bytes of the page
+	Bytes []byte
 
-	// TODO: This is just not the place to do this really
-	var header DatabaseHeader
-	if err := binary.Read(databaseFile, binary.BigEndian, &header); err != nil {
-		log.Fatal(err)
-	}
-
-	return &Pager{
-		File:     databaseFile,
-		DBHeader: header,
-		Cache:    make(map[uint32]BTreePage),
-	}
-}
-
-func (p *Pager) GetPage(pageNum uint32) BTreePage {
-	if _, ok := p.Cache[pageNum]; !ok {
-		p.Cache[pageNum] = readBTreePage(p.File, p.DBHeader, pageNum)
-	}
-	return p.Cache[pageNum]
+	// The offset from the beginning of the file at which the page starts
+	Offset uint64
 }

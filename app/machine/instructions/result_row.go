@@ -12,7 +12,7 @@ type ResultRow struct {
 
 var _ Instruction = ResultRow{}
 
-func (resultRow ResultRow) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
+func (resultRow ResultRow) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
 	var result []int

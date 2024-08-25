@@ -6,13 +6,13 @@ import (
 )
 
 type OpenRead struct {
-	RootPage uint32
-	CursorID uint32
+	RootPage uint64
+	CursorID uint64
 }
 
 var _ Instruction = OpenRead{}
 
-func (openRead OpenRead) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
+func (openRead OpenRead) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
 	p.NewCursor(openRead.CursorID, openRead.RootPage)

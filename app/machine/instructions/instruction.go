@@ -6,5 +6,5 @@ import (
 )
 
 type Instruction interface {
-	Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int
+	Execute(s *state.MachineState, p btree.BTreeEngine) [][]int
 }

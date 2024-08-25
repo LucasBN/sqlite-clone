@@ -1,13 +1,27 @@
 package main
 
 import (
+	"encoding/binary"
+	btreepkg "github/com/lucasbn/sqlite-clone/app/btree"
 	"github/com/lucasbn/sqlite-clone/app/generator"
 	"github/com/lucasbn/sqlite-clone/app/machine"
+	pagerpkg "github/com/lucasbn/sqlite-clone/app/pager"
 	"github/com/lucasbn/sqlite-clone/app/parser"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
 )
+
+type DatabaseHeader struct {
+	HeaderString     [16]byte
+	PageSize         uint16
+	FileWriteVersion uint8
+	FileReadVersion  uint8
+	ReservedSpace    uint8
+	Middle           [38]byte
+	TextEncoding     uint32
+	End              [40]byte
+}
 
 // Usage:
 // - sqlite3.sh sample.db .dbinfo
@@ -20,6 +34,25 @@ func main() {
 	dbFilePath := os.Args[1]
 	command := os.Args[2]
 
+	// Get the database header
+	header, err := getDatabaseHeader(dbFilePath)
+	if err != nil {
+		panic(err)
+	}
+
+	// Initialise a pager and defer closing it
+	simplePager, err := pagerpkg.NewSimplePager(dbFilePath, uint64(header.PageSize), uint64(header.ReservedSpace))
+	if err != nil {
+		panic(err)
+	}
+	defer simplePager.Close()
+
+	// Initialise a BTreeEngine
+	simpleBTreeEngine, err := btreepkg.NewSimpleBTreeEngine(simplePager)
+	if err != nil {
+		panic(err)
+	}
+
 	// 1. Parse the SQL string
 	stmt := parser.MustParse(command)
 
@@ -29,7 +62,7 @@ func main() {
 	// 3. Configure the virtual machine
 	m := machine.Init(machine.MachineConfig{
 		Instructions: instructions,
-		DBFilePath:   dbFilePath,
+		BTreeEngine:  simpleBTreeEngine,
 	})
 
 	// 4. Execute the program
@@ -37,4 +70,19 @@ func main() {
 
 	// 5. Pretty print the result
 	spew.Dump(result)
+}
+
+func getDatabaseHeader(filepath string) (*DatabaseHeader, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var header DatabaseHeader
+	if err := binary.Read(file, binary.BigEndian, &header); err != nil {
+		return nil, err
+	}
+
+	return &header, nil
 }

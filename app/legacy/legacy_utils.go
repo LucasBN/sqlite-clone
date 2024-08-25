@@ -1,4 +1,4 @@
-package pager
+package legacy
 
 type DatabaseHeader struct {
 	HeaderString     [16]byte

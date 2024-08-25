@@ -1,4 +1,4 @@
-package pager
+package legacy
 
 import "os"
 

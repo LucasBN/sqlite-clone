@@ -6,21 +6,27 @@ import (
 )
 
 type Column struct {
-	Cursor   uint32
-	Column   int
+	Cursor   uint64
+	Column   uint64
 	Register int
 }
 
 var _ Instruction = Column{}
 
-func (column Column) Execute(s *state.MachineState, p *btree.BTreeProcessor) [][]int {
+func (column Column) Execute(s *state.MachineState, p btree.BTreeEngine) [][]int {
 	s.CurrentAddress++
 
-	cursor := p.GetCursor(column.Cursor)
+	entry, err := p.ReadColumn(column.Cursor, column.Column)
+	if err != nil {
+		panic(err)
+	}
 
-	value := cursor.ReadColumn(column.Column)
-
-	s.Registers.Set(column.Register, value)
+	switch entry.(type) {
+	case btree.BTreeNumberEntry:
+		s.Registers = s.Registers.Set(column.Register, int(entry.(btree.BTreeNumberEntry).Value))
+	default:
+		panic("Unknown entry type")
+	}
 
 	return [][]int{}
 }
