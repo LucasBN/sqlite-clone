@@ -7,6 +7,7 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine"
 	pagerpkg "github/com/lucasbn/sqlite-clone/app/pager"
 	"github/com/lucasbn/sqlite-clone/app/parser"
+	"github/com/lucasbn/sqlite-clone/app/types"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
@@ -54,7 +55,7 @@ func main() {
 	defer pager.Close()
 
 	// Initialise a BTreeEngine
-	bTreeEngine, err := btreepkg.NewBTreeEngine(pager)
+	bTreeEngine, err := btreepkg.NewBTreeEngine(pager, &types.EntryConstructor{})
 	if err != nil {
 		panic(err)
 	}
@@ -63,11 +64,11 @@ func main() {
 	stmt := parser.MustParse(command)
 
 	// 2. Generate the bytecode
-	instructions := generator.Generate(stmt)
+	instructions := generator.Generate[types.Entry](stmt)
 
 	// 3. Configure the virtual machine
 	m := machine.Init(
-		machine.MachineConfig{
+		machine.MachineConfig[types.Entry]{
 			Instructions: instructions,
 			BTreeEngine:  bTreeEngine,
 		},

@@ -6,27 +6,27 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type Machine struct {
-	BTreeEngine common.BTreeEngine
-	State       *state.MachineState
-	Program     []instructions.Instruction
-	Output      [][]int
+type Machine[T any] struct {
+	BTreeEngine common.BTreeEngine[T]
+	State       *state.MachineState[T]
+	Program     []instructions.Instruction[T]
+	Output      [][]T
 }
 
-type MachineConfig struct {
-	Instructions []instructions.Instruction
-	BTreeEngine  common.BTreeEngine
+type MachineConfig[T any] struct {
+	Instructions []instructions.Instruction[T]
+	BTreeEngine  common.BTreeEngine[T]
 }
 
-func Init(config MachineConfig) *Machine {
-	return &Machine{
+func Init[T any](config MachineConfig[T]) *Machine[T] {
+	return &Machine[T]{
 		BTreeEngine: config.BTreeEngine,
 		Program:     config.Instructions,
-		State:       state.Init(),
+		State:       state.Init[T](),
 	}
 }
 
-func (m *Machine) Run() [][]int {
+func (m *Machine[T]) Run() [][]T {
 	for {
 		if len(m.Program) <= m.State.CurrentAddress {
 			panic("Unreachable: attemping to run instruction at invalid address")

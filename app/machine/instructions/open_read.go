@@ -5,17 +5,17 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type OpenRead struct {
+type OpenRead[T any] struct {
 	RootPage uint64
 	CursorID uint64
 }
 
-var _ Instruction = OpenRead{}
+var _ Instruction[any] = OpenRead[any]{}
 
-func (openRead OpenRead) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (openRead OpenRead[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	s.CurrentAddress++
 
 	b.NewCursor(openRead.CursorID, openRead.RootPage)
 
-	return [][]int{}
+	return [][]T{}
 }

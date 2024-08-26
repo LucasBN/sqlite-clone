@@ -5,11 +5,11 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type Halt struct{}
+type Halt[T any] struct{}
 
-var _ Instruction = Halt{}
+var _ Instruction[any] = Halt[any]{}
 
-func (Halt) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (Halt[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	s.Halted = true
-	return [][]int{}
+	return [][]T{}
 }

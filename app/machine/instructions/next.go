@@ -5,14 +5,14 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type Next struct {
+type Next[T any] struct {
 	Cursor      uint64
 	FromAddress uint64
 }
 
-var _ Instruction = Next{}
+var _ Instruction[any] = Next[any]{}
 
-func (next Next) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (next Next[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	didAdvance, err := b.AdvanceCursor(next.Cursor)
 	if err != nil {
 		panic(err)
@@ -26,5 +26,5 @@ func (next Next) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
 		s.CurrentAddress = int(next.FromAddress)
 	}
 
-	return [][]int{}
+	return [][]T{}
 }

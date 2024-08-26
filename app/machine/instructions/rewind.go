@@ -5,13 +5,13 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type Rewind struct {
+type Rewind[T any] struct {
 	Cursor uint64
 }
 
-var _ Instruction = Rewind{}
+var _ Instruction[any] = Rewind[any]{}
 
-func (rewind Rewind) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (rewind Rewind[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	s.CurrentAddress++
 
 	_, err := b.RewindCursor(rewind.Cursor)
@@ -19,5 +19,5 @@ func (rewind Rewind) Execute(s *state.MachineState, b common.BTreeEngine) [][]in
 		panic(err)
 	}
 
-	return [][]int{}
+	return [][]T{}
 }

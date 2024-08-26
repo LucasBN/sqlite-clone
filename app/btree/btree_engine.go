@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"github/com/lucasbn/sqlite-clone/app/types"
 
 	"github.com/samber/lo"
 )
@@ -16,22 +15,30 @@ type Pager interface {
 	GetPage(pageNum uint64) ([]byte, error)
 }
 
-type BTreeEngine struct {
-	Pager   Pager
-	Cursors map[uint64]*cursor
+type ValueType[T any] interface {
+	Number(uint64) T
+	Text(string) T
+	Null() T
 }
 
-func NewBTreeEngine(pager Pager) (*BTreeEngine, error) {
-	return &BTreeEngine{
-		Pager:   pager,
-		Cursors: make(map[uint64]*cursor),
+type BTreeEngine[T any] struct {
+	Pager             Pager
+	Cursors           map[uint64]*cursor
+	ResultConstructor ValueType[T]
+}
+
+func NewBTreeEngine[T any](pager Pager, resultConstructor ValueType[T]) (*BTreeEngine[T], error) {
+	return &BTreeEngine[T]{
+		Pager:             pager,
+		Cursors:           make(map[uint64]*cursor),
+		ResultConstructor: resultConstructor,
 	}, nil
 }
 
 // NewCursor creates a new cursor with the given ID that points to the table or
 // index at the given root page number. The cursor is initialized to point at
 // the very beginning of the root page.
-func (b *BTreeEngine) NewCursor(id uint64, rootPageNum uint64) (bool, error) {
+func (b *BTreeEngine[T]) NewCursor(id uint64, rootPageNum uint64) (bool, error) {
 	// Check if a cursor with the given ID already exists
 	if _, ok := b.Cursors[id]; ok {
 		return false, errors.New("cursor with the given ID already exists")
@@ -50,7 +57,7 @@ func (b *BTreeEngine) NewCursor(id uint64, rootPageNum uint64) (bool, error) {
 
 // RewindCusor moves the cursor to the first entry in the database table or
 // index.
-func (b *BTreeEngine) RewindCursor(id uint64) (bool, error) {
+func (b *BTreeEngine[T]) RewindCursor(id uint64) (bool, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
 	if err != nil {
@@ -77,7 +84,7 @@ func (b *BTreeEngine) RewindCursor(id uint64) (bool, error) {
 
 // AdvanceCursor moves the cursor to the next leaf cell in the database table or
 // index.
-func (b *BTreeEngine) AdvanceCursor(id uint64) (bool, error) {
+func (b *BTreeEngine[T]) AdvanceCursor(id uint64) (bool, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
 	if err != nil {
@@ -101,17 +108,17 @@ func (b *BTreeEngine) AdvanceCursor(id uint64) (bool, error) {
 	return true, nil
 }
 
-func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) {
+func (b *BTreeEngine[T]) ReadColumn(id uint64, column uint64) (T, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
 	if err != nil {
-		return nil, err
+		return b.ResultConstructor.Null(), err
 	}
 
 	// Get the page of the table or index
 	page, err := b.Pager.GetPage(cursor.CurrentPage)
 	if err != nil {
-		return nil, err
+		return b.ResultConstructor.Null(), err
 	}
 
 	// Get the byte offset at which the cell ends
@@ -124,7 +131,7 @@ func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) 
 		// Otherwise, the cell end is the start of the previous cell
 		nextCell, ok, err := b.getCellPointer(*cursor.CurrentCell-1, cursor.CurrentPage)
 		if err != nil || !ok {
-			return nil, err
+			return b.ResultConstructor.Null(), err
 		}
 		cellEnd = *nextCell
 	}
@@ -145,7 +152,7 @@ func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) 
 	// overflowing onto another page. I'm not going to implement it here and
 	// instead panic if we encounter this case
 	if payloadSize > uint64(b.Pager.PageSize()-b.Pager.ReservedSpace()) {
-		return nil, errors.New("unsupported: payload overflows onto another page")
+		return b.ResultConstructor.Null(), errors.New("unsupported: payload overflows onto another page")
 	}
 
 	// Read the row ID from the cell
@@ -184,9 +191,9 @@ func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) 
 	}
 
 	for idx, typeCode := range typeCodes {
-		var entry types.Entry
+		var entry T
 		if typeCode == 0 {
-			entry = types.NullEntry{}
+			entry = b.ResultConstructor.Null()
 		} else if typeCode >= 1 && typeCode <= 6 {
 			// Make an 8 byte empty slice
 			result := make([]byte, 8)
@@ -201,18 +208,17 @@ func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) 
 			for i := 7; 7-i < len(value); i-- {
 				result[i] = value[7-i]
 			}
-
-			entry = types.NumberEntry{Value: binary.BigEndian.Uint64(result)}
+			entry = b.ResultConstructor.Number(binary.BigEndian.Uint64(result))
 		} else if typeCode == 8 {
-			entry = types.NumberEntry{Value: 0}
+			entry = b.ResultConstructor.Number(0)
 		} else if typeCode == 9 {
-			entry = types.NumberEntry{Value: 1}
+			entry = b.ResultConstructor.Number(1)
 		} else if typeCode >= 12 && typeCode%2 == 1 {
 			length := (typeCode - 12) / 2
-			entry = types.TextEntry{Value: string(cell[pointer : pointer+length])}
+			entry = b.ResultConstructor.Text(string(cell[pointer : pointer+length]))
 			pointer += length
 		} else {
-			return nil, errors.New("unsupported type code: not implemented")
+			return b.ResultConstructor.Null(), errors.New("unsupported type code: not implemented")
 		}
 
 		if uint64(idx) == column {
@@ -222,10 +228,10 @@ func (b *BTreeEngine) ReadColumn(id uint64, column uint64) (types.Entry, error) 
 	}
 
 	// If the column wasn't found, return a null entry
-	return types.NullEntry{}, nil
+	return b.ResultConstructor.Null(), nil
 }
 
-func (b *BTreeEngine) getCursor(id uint64) (*cursor, error) {
+func (b *BTreeEngine[T]) getCursor(id uint64) (*cursor, error) {
 	cursor, ok := b.Cursors[id]
 	if !ok {
 		return nil, errors.New("cursor with the given ID does not exist")
@@ -234,7 +240,7 @@ func (b *BTreeEngine) getCursor(id uint64) (*cursor, error) {
 	return cursor, nil
 }
 
-func (b *BTreeEngine) getCellPointer(cellNum uint64, pageNum uint64) (*uint64, bool, error) {
+func (b *BTreeEngine[T]) getCellPointer(cellNum uint64, pageNum uint64) (*uint64, bool, error) {
 	// Get the page of the table or index
 	page, err := b.Pager.GetPage(pageNum)
 	if err != nil {

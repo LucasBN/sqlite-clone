@@ -26,6 +26,20 @@ type TextEntry struct {
 	Value string
 }
 
+type EntryConstructor struct{}
+
+func (r *EntryConstructor) Number(value uint64) Entry {
+	return NumberEntry{Value: value}
+}
+
+func (r *EntryConstructor) Text(value string) Entry {
+	return TextEntry{Value: value}
+}
+
+func (r *EntryConstructor) Null() Entry {
+	return NullEntry{}
+}
+
 var _ Entry = &NullEntry{}
 var _ Entry = &NumberEntry{}
 var _ Entry = &TextEntry{}

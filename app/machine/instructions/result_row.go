@@ -5,19 +5,19 @@ import (
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
 )
 
-type ResultRow struct {
+type ResultRow[T any] struct {
 	FromRegister int
 	ToRegister   int
 }
 
-var _ Instruction = ResultRow{}
+var _ Instruction[any] = ResultRow[any]{}
 
-func (resultRow ResultRow) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (resultRow ResultRow[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	s.CurrentAddress++
 
-	var result []int
+	var result []T
 	for i := resultRow.FromRegister; i <= resultRow.ToRegister; i++ {
 		result = append(result, s.Registers.Get(i))
 	}
-	return [][]int{result}
+	return [][]T{result}
 }

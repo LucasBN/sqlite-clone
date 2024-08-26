@@ -3,18 +3,17 @@ package instructions
 import (
 	"github/com/lucasbn/sqlite-clone/app/machine/common"
 	"github/com/lucasbn/sqlite-clone/app/machine/state"
-	"github/com/lucasbn/sqlite-clone/app/types"
 )
 
-type Column struct {
+type Column[T any] struct {
 	Cursor   uint64
 	Column   uint64
 	Register int
 }
 
-var _ Instruction = Column{}
+var _ Instruction[any] = Column[any]{}
 
-func (column Column) Execute(s *state.MachineState, b common.BTreeEngine) [][]int {
+func (column Column[T]) Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T {
 	s.CurrentAddress++
 
 	entry, err := b.ReadColumn(column.Cursor, column.Column)
@@ -22,12 +21,7 @@ func (column Column) Execute(s *state.MachineState, b common.BTreeEngine) [][]in
 		panic(err)
 	}
 
-	switch e := entry.(type) {
-	case types.NumberEntry:
-		s.Registers = s.Registers.Set(column.Register, int(e.Value))
-	default:
-		panic("Unknown entry type")
-	}
+	s.Registers = s.Registers.Set(column.Register, entry)
 
-	return [][]int{}
+	return [][]T{}
 }
