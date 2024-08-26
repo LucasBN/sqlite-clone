@@ -8,26 +8,26 @@ import (
 	"github.com/samber/lo"
 )
 
-type Pager interface {
+type pager interface {
 	Close() error
 	PageSize() uint64
 	ReservedSpace() uint64
 	GetPage(pageNum uint64) ([]byte, error)
 }
 
-type ValueType[T any] interface {
+type valueType[T any] interface {
 	Number(uint64) T
 	Text(string) T
 	Null() T
 }
 
 type BTreeEngine[T any] struct {
-	Pager             Pager
+	Pager             pager
 	Cursors           map[uint64]*cursor
-	ResultConstructor ValueType[T]
+	ResultConstructor valueType[T]
 }
 
-func NewBTreeEngine[T any](pager Pager, resultConstructor ValueType[T]) (*BTreeEngine[T], error) {
+func NewBTreeEngine[T any](pager pager, resultConstructor valueType[T]) (*BTreeEngine[T], error) {
 	return &BTreeEngine[T]{
 		Pager:             pager,
 		Cursors:           make(map[uint64]*cursor),
