@@ -15,7 +15,7 @@ type pager interface {
 	GetPage(pageNum uint64) ([]byte, error)
 }
 
-type valueType[T any] interface {
+type resultTypeConstructor[T any] interface {
 	Number(uint64) T
 	Text(string) T
 	Null() T
@@ -24,10 +24,10 @@ type valueType[T any] interface {
 type BTreeEngine[T any] struct {
 	Pager             pager
 	Cursors           map[uint64]*cursor
-	ResultConstructor valueType[T]
+	ResultConstructor resultTypeConstructor[T]
 }
 
-func NewBTreeEngine[T any](pager pager, resultConstructor valueType[T]) (*BTreeEngine[T], error) {
+func NewBTreeEngine[T any](pager pager, resultConstructor resultTypeConstructor[T]) (*BTreeEngine[T], error) {
 	return &BTreeEngine[T]{
 		Pager:             pager,
 		Cursors:           make(map[uint64]*cursor),
