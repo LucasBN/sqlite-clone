@@ -8,19 +8,6 @@ import (
 	"github.com/samber/lo"
 )
 
-type pager interface {
-	Close() error
-	PageSize() uint64
-	ReservedSpace() uint64
-	GetPage(pageNum uint64) ([]byte, error)
-}
-
-type resultTypeConstructor[T any] interface {
-	Number(uint64) T
-	Text(string) T
-	Null() T
-}
-
 type BTreeEngine[T any] struct {
 	Pager             pager
 	Cursors           map[uint64]*cursor
@@ -33,6 +20,19 @@ func NewBTreeEngine[T any](pager pager, resultConstructor resultTypeConstructor[
 		Cursors:           make(map[uint64]*cursor),
 		ResultConstructor: resultConstructor,
 	}, nil
+}
+
+type pager interface {
+	Close() error
+	PageSize() uint64
+	ReservedSpace() uint64
+	GetPage(pageNum uint64) ([]byte, error)
+}
+
+type resultTypeConstructor[T any] interface {
+	Number(uint64) T
+	Text(string) T
+	Null() T
 }
 
 // NewCursor creates a new cursor with the given ID that points to the table or
