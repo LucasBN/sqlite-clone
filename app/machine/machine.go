@@ -18,7 +18,7 @@ type MachineConfig[T any] struct {
 	BTreeEngine  common.BTreeEngine[T]
 }
 
-func Init[T any](config MachineConfig[T]) *Machine[T] {
+func NewMachine[T any](config MachineConfig[T]) *Machine[T] {
 	return &Machine[T]{
 		BTreeEngine: config.BTreeEngine,
 		Program:     config.Instructions,

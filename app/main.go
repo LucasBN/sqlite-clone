@@ -67,7 +67,7 @@ func main() {
 	instructions := generator.Generate[types.Entry](stmt)
 
 	// 3. Configure the virtual machine
-	m := machine.Init(
+	m := machine.NewMachine(
 		machine.MachineConfig[types.Entry]{
 			Instructions: instructions,
 			BTreeEngine:  bTreeEngine,
