@@ -1,18 +1,18 @@
 package registers
 
-type RegisterFile struct {
-	Value map[int]int
+type RegisterFile[T any] struct {
+	Value map[int]T
 }
 
-func Init() RegisterFile {
-	return RegisterFile{Value: make(map[int]int)}
+func Init[T any]() RegisterFile[T] {
+	return RegisterFile[T]{Value: make(map[int]T)}
 }
 
-func (r RegisterFile) Get(register int) int {
+func (r RegisterFile[T]) Get(register int) T {
 	return r.Value[register]
 }
 
-func (r RegisterFile) Set(register int, value int) RegisterFile {
+func (r RegisterFile[T]) Set(register int, value T) RegisterFile[T] {
 	r.Value[register] = value
 	return r
 }

@@ -1,4 +1,4 @@
-package main
+package legacy
 
 import (
 	"encoding/binary"
@@ -23,7 +23,7 @@ type RecordEntry struct {
 	Text            *string
 }
 
-func readRecord(rawRecord []byte) Record {
+func ReadRecord(rawRecord []byte) Record {
 	// We first have to read the entire raw record header, which is at the
 	// beginning of the raw record and is made up of one or more varints.
 	// The first varint gives the size of the header, and we should keep

@@ -2,16 +2,16 @@ package state
 
 import "github/com/lucasbn/sqlite-clone/app/machine/registers"
 
-type MachineState struct {
+type MachineState[T any] struct {
 	CurrentAddress int
-	Registers      registers.RegisterFile
+	Registers      registers.RegisterFile[T]
 	Halted         bool
 }
 
-func Init() *MachineState {
-	return &MachineState{
+func Init[T any]() *MachineState[T] {
+	return &MachineState[T]{
 		CurrentAddress: 0,
-		Registers:      registers.Init(),
+		Registers:      registers.Init[T](),
 		Halted:         false,
 	}
 }

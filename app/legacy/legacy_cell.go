@@ -1,4 +1,6 @@
-package main
+package legacy
+
+import "github.com/samber/lo"
 
 type LeafTableCell struct {
 	PayloadSize  uint64
@@ -43,11 +45,13 @@ func readCell(page *BTreePage, dbHeader DatabaseHeader, data []byte) {
 func readLeafTableCell(header DatabaseHeader, data []byte) LeafTableCell {
 	var cell LeafTableCell
 
+	end := lo.Ternary(9 > len(data)-1, len(data)-1, 9)
+
 	var offsetPayloadSize uint16
-	cell.PayloadSize, offsetPayloadSize = decodeVarInt(data[:9])
+	cell.PayloadSize, offsetPayloadSize = decodeVarInt(data[:end])
 
 	var offsetRowID uint16
-	cell.RowID, offsetRowID = decodeVarInt(data[offsetPayloadSize : offsetPayloadSize+9])
+	cell.RowID, offsetRowID = decodeVarInt(data[offsetPayloadSize : offsetPayloadSize+uint16(end)])
 
 	// This doesn't take into account the case where the cell overflows onto the
 	// next page (which means that the last four bytes of the cell are a pointer

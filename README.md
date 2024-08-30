@@ -1,153 +1,209 @@
-# Reading the database file
+# SQLite3 Clone - A Serverless Single File Database
 
-I've made a few design decisions related to how pages, cells and records are
-stored, as well as how tables are read.
+A simple SQL database engine written in Go, which reads and writes data on a
+single file in the SQLite3 [file format](https://www.sqlite.org/fileformat.html#storage_of_the_sql_database_schema).
 
-A cell is treated as something that exists entirely within the context of a
-b-tree page, and the type of the cell is entirely dependent on the type of
-b-tree page. A b-tree page looks like:
+You can run the database engine with the following command:
 
 ```
-type BTreePage struct {
-	Header         BTreeHeader
-	IntIdxCells    []IntIdxCell
-	IntTableCells  []IntTableCell
-	LeafIdxCells   []LeafIdxCell
-	LeafTableCells []LeafTableCell
-}
+./sqlite sample.db
 ```
 
-The header contains information like the page type, number of cells and cell
-content offset (among others, as defined by the SQLite database file format).
+This project is in it's early stages of development, which means that it does
+not yet support many features.
 
-I briefly considered separating out cells and then attempting to traverse all
-overflow pages to bring the entire payload together, but I decided this was a
-really bad idea because:
+The section on architecture below will go into more depth about the various
+layers that make up the engine, but at present there are only implementations
+for the `Machine`, `BTreeEngine` and `Pager` layers.
 
-i. I'm doing this inside a function called `readBTreePage` which takes a page
-number and it feels weird for this to make subsequent calls to read other pages
-and to return data that is actually stored on other pages.
+This means that you cannot actually pass arbitrary SQL - the `Parser` and
+`Generator` layers are mocked and return hard coded instructions.
 
-ii. I'm not sure how this would end up looking for interior pages (which I
-haven't yet implemented). My suspicion is that it would be quite horrible.
+# Architecture
 
-I decided to go for an approach which seems much more sensible: the
-`readBTreePage` function would only read and return the data on the page that it
-was asked about, and the caller would be responsible for interpreting that data.
+### Birds Eye View
 
-Right now, the only caller is `readTable`, which takes a `rootPage`. This
-function first calls `readBTreePage` on the root page itself, but of course the
-data of the table may be split across multiple pages - which we only find out
-after we have read the root page. After reading the root page, `readTable` will
-read all other necessary pages to create a list of 'raw records' which are
-essentially byte slices that contain _all_ of the data for a record and have no
-dependency or reference to pages. This allows us to pass the entire raw record
-to a function that is responsible for decoding the record into a useable format
-(see `record.go`).
+![Birds Eye View](images/architecture-birds-eye-view.png)
 
-So far, I think this is a good structure and will allow me to (fingers crossed)
-easily add support for things like overflown cells and interior pages
+The image above is a visual depiction of the `DatabaseEngine`, which is
+responsible for glueing together independent layers and providing an interface
+for executing SQL statements and `meta` commands (e.g `.dbinfo`).
 
-# Virtual Database Engine (VDBE)
+There are 5 layers: `Pager`, `BTreeEngine`, `Machine`, `Generator` and `Parser`. Each
+of these layers is designed to be completely independent of other layers. A
+layer is responsible for defining the interface by which it expects to make calls
+to another layer.
 
-I've now got my hands dirty with reading data from a simple SQLite database file
-and feel somewhat confident that I could continue down this path to flesh out
-the functionality a bit (i.e handling interior pages and supporting indexes).
+This means that layers are decoupled, and don't really on the implementation
+details of any other layers. The reasoning for this is so that layers can be
+independently tested and so that the entire functionality of a layer resides
+in the same package (although they are allowed to have sub-packages) which helps
+to create a 'separation of concerns'.
 
-However, I'm going to switch my attention to a very different aspect: bytecode.
-Unlike database engines like PostgreSQL and MySQL which execute SQL by walking a
-tree of objects (similar but not the same as an AST), SQLite executes SQL by
-executing bytecode on a virtual machine.
+In the future, I'd like to potentially create different implementations of some
+layers and figure out a way to profile them (i.e compare CPU and memory usage).
 
-The [SQLite docs](https://www.sqlite.org/whybytecode.html) go into a lot of
-detail as to why the developers made this choice, but to briefly summarise:
+There is a global package for `types` which contains an `Entry` which is a union
+of a `null` value, a `string` and a `int`. These are the types of values that can
+be stored in the database, which is a detail that only the `BTreeEngine` really
+needs to be concerned with.
 
-1. Easier to understand: linear and "atomic" instructions
-2. Easier to debug: clearer separation between frontend and backend
-3. Can be run incrementally (important since it runs locally, not on a server)
-4. Bytecode is smaller than the AST representation (important for caching)
-5. It _might_ be faster but a fair comparison is difficult
-
-### What does SQLite bytecode look like?
-
-It's really easy to see what bytecode is produced by SQLite:
-
-```
-$ sqlite3
-sqlite> EXPLAIN SELECT 1;
-| addr | opcode    | p1 | p2 | p3 | p4 | p5 |
-|------|-----------|----|----|----|----|----|
-| 0    | Init      | 0  | 4  | 0  | 0  | 0  | <- Jump to address 4
-| 1    | Integer   | 1  | 1  | 0  | 0  | 0  | <- Put the value 1 into register 1
-| 2    | ResultRow | 1  | 1  | 0  | 0  | 0  | <- Output the value of register 1
-| 3    | Halt      | 0  | 0  | 0  | 0  | 0  | <- Halt execution
-| 4    | Goto      | 0  | 1  | 0  | 0  | 0  | <- Jump to address 1
-```
-
-This output gives me a fairly clear idea on how to make a virtual machine
-capable of running such instructions. Since I'm more interested in the actual
-internals of a database rather than the higher level interfaces, I'm going to
-continue working "back to front" - which means that for now I'm not going to
-spend any time worrying about writing an SQL parser that generates bytecode, I'm
-just going to write a simple virtual machine that can execute a subset of the
-instructions described in the SQLite docs.
-
-### Architecture of my VDBE
-
-I'm unsure about my initial implementation (I don't know if it's "efficient" or
-not - and I don't know if that really even matters?), but the directory
-structure looks like:
-
-```
-machine
-|-- instructions
-|    +-- instruction.go
-|    +-- integer.go
-|    +-- halt.go
-|    +-- result_row.go
-|-- registers
-|    +-- register.go
-|-- state
-|    +-- state.go
-+-- machine.go
-```
-
-I've also created a few data types (structs) to represent the machine:
-
-1. Machine: machine state, the program and the output buffer
-2. State: current address, registers, halted
-3. RegisterFile: map from int to int
-4. Instruction: interface with an execute function
-
-The purpose of creating these abstractions was to get to a point where I could
-extend the capabilities of the VM by only having to define the execute function
-on new instructions.
-
-A 'Machine' has a `Run()` function on it which repeatedly calls execute on the
-instruction at the current address (instruction pointer) until the halt state is
-reached. Each call to `Execute` is passed a pointer to the current machine
-state, and updates the state according to the instructions specification.
-
-The `State` is not directly embedded in the `Machine` struct because the state
-is relevant to instructions (and is therefore imported by the instructions
-package), but the other fields on the machine (output and program) are not
-relevant to execution of a single instruction (and therefore don't need to be
-accessible / imported). This enforces a separation of concerns (and avoids
-import cycles).
-
-The following instructions are sufficient to execute bytecode that represents
-the query `SELECT 1, 2;`:
+Therefore, we can initialise the `Machine` with a generic type `T` which represents
+the 'output' type of the machine - the `Machine` can take any type here. However,
+the `BTreeEngine` takes a generic type `T` that conforms to the following interface:
 
 ```go
-instructions := []instructions.Instruction{
-	instructions.Integer{Register: 1, Value: 1},
-	instructions.Integer{Register: 2, Value: 2},
-	instructions.ResultRow{FromRegister: 1, ToRegister: 2},
-	instructions.Halt{},
+type resultTypeConstructor[T any] interface {
+    Number(uint64) T
+    Text(string) T
+    Null() T
 }
-m := machine.Init(instructions)
-output := m.Run()
 ```
 
-This is cool and lays down the foundations for a VDBE - we now need to implement
-instructions that are able to interact with the database file!
+This is the `BTreeEngine`'s way of saying 'I need you to provide me a type that
+knows how to construct a `T` of all of the values that I store'.
+
+The intention here is to ensure that all layers are independent entities that don't
+rely on external packages - they are valid packages in isolation that fulfill their
+single responsiblity. I'm not confident that this is the right thing to do here,
+and I'm open for criticism/alternatives. 
+
+I can think of some argument against this which is like: "`Entry` is basically a 
+primitive type like `int` or `string` and so it is completely acceptable to import 
+it everywhere and have packages depend on it.
+
+The "each layer needs to be independent and not rely on external packages" goal / p
+attern is _not_ so that I can publish these as separate packages that other developers 
+can rely on - it's to help make the code more readable and maintainable for myself 
+and anyone else that works on this project. This makes me wonder if the `resultTypeConstructor` 
+actually helps with readability/maintainability, or if I'm just doing it to remove
+any external dependencies for packages. I have a feeling it might be the latter and
+I'll want to reconsider this change
+
+### Layer 1: Pager
+
+The pager is responsible for efficiently reading and writing pages to/from a file,
+and is not concerned with things like:
+
+1. The contents of a page
+2. The format of the file
+3. The 'context' of the file (e.g a database)
+
+It could be used as a means for interacting with _any_ page-based file, and
+conforms to the following interface:
+
+```go
+type Pager interface {
+    Close() error
+    PageSize() uint64
+    ReservedSpace() uint64
+    GetPage(pageNum uint64) ([]byte, error)
+}
+```
+
+It can be instantied with the following constructor:
+
+```go
+func NewPager(filepath string, config PagerConfig) (*Pager, error)
+```
+
+where the `config` contains the page size and the number of reserved bytes at the
+end of each page.
+
+The pager has a cache, which is implemented as a hash map that relates page
+numbers to a byte slice (which is the length of a page).
+
+There's likely a huge number of optimisations that could be done here, and I'm
+deliberately doing none of them now (other than the very simple cache described
+above) because my primary aim is to get an end-to-end simple, extensible and
+functional system.
+
+Currently, the pager takes a filepath and opens the file itself. I'd like to spend
+some time thinking about what consequences this has on testing - would it be better
+to pass in a file that is opened elsewhere so that I could potentially mock a file
+in unit tests?
+
+### Layer 2: BTreeEngine
+
+The BTreeEngine is responsible for providing an interface for callers to interact
+with B-Tree structures encoded by the database file.
+
+```go
+type BTreeEngine[T any] interface {
+    NewCursor(id uint64, rootPageNum uint64) (bool, error)
+    RewindCursor(id uint64) (bool, error)
+    AdvanceCursor(id uint64) (bool, error)
+    ReadColumn(id uint64, column uint64) (T, error)
+}
+```
+
+This is done through 'cursors' which are pointers to a particular entry in a
+B-Tree.
+
+When a cursor is initialised with `NewCursor()` it points to the first byte on
+the root page, and is set to point at the first B-Tree entry via the `RewindCursor()`
+function. `AdvanceCursor()` moves the cursor along to the next entry, and `ReadColumn()`
+reads a particular column in the entry that is currently being pointed to.
+
+This is the only layer that knows about the SQLite3 file format, which means that
+this is the only layer that would need to change if the file format were to change.
+
+It can be instantied with the following constructor:
+
+```go
+func NewBTreeEngine[T any](pager pager, resultConstructor resultTypeConstructor[T]) (*BTreeEngine[T], error)
+```
+
+The `resultTypeConstructor` has been discussed in detail above, but it is something
+which tells the `BTreeEngine` how to construct objects of type `T` out of (in this case)
+`int`s `string`s or `null`s - the `BTreeEngine` is responsible for specifying which
+primitive types it stores and hence needs to create `T`s out of.
+
+### Layer 3: Machine
+
+The `Machine` is a simple virtual machine that executes a set of bytecode instructions.
+The bytecode instruction set is defined in the `instructions` package, and each
+instruction must conform to the following interface:
+
+```go
+type Instruction[T any] interface {
+	Execute(s *state.MachineState[T], b common.BTreeEngine[T]) [][]T
+}
+```
+
+Arguments are defined directly on implementations of this interface, and are used
+to update the machine state `s` and are able to access the database via `b` which is
+the `BTreeEngine`.
+
+The return type is `[][]T` which means an instruction can return multiple tuples of 
+type `T`.
+
+A machine is instantiated with the following constructor:
+
+```go
+func NewMachine[T any](config MachineConfig[T]) *Machine[T]
+```
+
+The `config` contains a list of instructions and a pointer to a `BTreeEngine`.
+The machine then initialises its `state` which stores the current address, the registers
+and whether or not the machine is halted.
+
+When `Run` is called on a machine, it will pick the instruction at the current address
+and call `Execute` on it. This will happen continuously in a loop until the machine
+is halted (by setting `halted` to `true` on the `state`).
+
+A `register` is a map from an `int` (register number) to a `T` which means that
+a register stores individual entries from a tuple.
+
+### Layer 4: Bytecode Generator
+
+TODO
+
+### Layer 5: Parser
+
+TODO
+
+# Useful links
+
+- [SQLite3 File Format](https://www.sqlite.org/fileformat.html#storage_of_the_sql_database_schema)
+- [SQLite3 Opcodes](https://www.sqlite.org/opcode.html)

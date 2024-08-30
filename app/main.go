@@ -2,76 +2,96 @@ package main
 
 import (
 	"encoding/binary"
-	"fmt"
+	btreepkg "github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/generator"
 	"github/com/lucasbn/sqlite-clone/app/machine"
-	"github/com/lucasbn/sqlite-clone/app/machine/instructions"
-	"log"
+	pagerpkg "github/com/lucasbn/sqlite-clone/app/pager"
+	"github/com/lucasbn/sqlite-clone/app/parser"
+	"github/com/lucasbn/sqlite-clone/app/types"
 	"os"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/xwb1989/sqlparser"
 )
 
-// Usage: sqlite3.sh sample.db .dbinfo
+type DatabaseHeader struct {
+	HeaderString     [16]byte
+	PageSize         uint16
+	FileWriteVersion uint8
+	FileReadVersion  uint8
+	ReservedSpace    uint8
+	Middle           [38]byte
+	TextEncoding     uint32
+	End              [40]byte
+}
+
+// Usage:
+// - sqlite3.sh sample.db .dbinfo
+// - sqlite3.sh sample.db "SELECT * FROM users;"
+//
+// This is really just a temporary entry point into the system. In the future we
+// could add support for some sort of REPL... but that's not really the point of
+// doing this project so I'll leave that for a rainy day.
 func main() {
-
-	instructions := []instructions.Instruction{
-		instructions.Integer{Register: 1, Value: 1},
-		instructions.Integer{Register: 2, Value: 2},
-		instructions.ResultRow{FromRegister: 1, ToRegister: 2},
-		instructions.Halt{},
-	}
-	spew.Dump(machine.Init(instructions).Run())
-
-	return
-
-	databaseFilePath := os.Args[1]
+	dbFilePath := os.Args[1]
 	command := os.Args[2]
 
-	// Open the database file and defer its closing
-	databaseFile, err := os.Open(databaseFilePath)
+	// Get the database header
+	header, err := getDatabaseHeader(dbFilePath)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer databaseFile.Close()
 
-	// Read the database header
+	// Initialise a pager and defer closing it
+	pager, err := pagerpkg.NewPager(
+		dbFilePath,
+		pagerpkg.PagerConfig{
+			PageSize:      uint64(header.PageSize),
+			ReservedSpace: uint64(header.ReservedSpace),
+		},
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer pager.Close()
+
+	// Initialise a BTreeEngine
+	bTreeEngine, err := btreepkg.NewBTreeEngine(pager, &types.EntryConstructor{})
+	if err != nil {
+		panic(err)
+	}
+
+	// 1. Parse the SQL string
+	stmt := parser.MustParse(command)
+
+	// 2. Generate the bytecode
+	instructions := generator.Generate[types.Entry](stmt)
+
+	// 3. Configure the virtual machine
+	m := machine.NewMachine(
+		machine.MachineConfig[types.Entry]{
+			Instructions: instructions,
+			BTreeEngine:  bTreeEngine,
+		},
+	)
+
+	// 4. Execute the program
+	result := m.Run()
+
+	// 5. Pretty print the result
+	spew.Dump(result)
+}
+
+func getDatabaseHeader(filepath string) (*DatabaseHeader, error) {
+	file, err := os.Open(filepath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
 	var header DatabaseHeader
-	if err := binary.Read(databaseFile, binary.BigEndian, &header); err != nil {
-		fmt.Println("Failed to read integer:", err)
-		return
+	if err := binary.Read(file, binary.BigEndian, &header); err != nil {
+		return nil, err
 	}
 
-	switch command {
-	case ".dbinfo":
-		dbinfo(databaseFile, header)
-	case ".tables":
-		tables(databaseFile, header)
-	default:
-		stmt, err := sqlparser.Parse(command)
-		if err != nil {
-			fmt.Println("Unknown command", command)
-			os.Exit(1)
-		}
-
-		Execute(stmt, databaseFile, header)
-	}
-
-}
-
-func dbinfo(databaseFile *os.File, header DatabaseHeader) {
-	schema := readSQLiteSchema(databaseFile, header)
-
-	fmt.Printf("database page size: %v\n", header.PageSize)
-	fmt.Printf("number of tables: %v\n", schema.TableCount())
-}
-
-func tables(databaseFile *os.File, header DatabaseHeader) {
-	schema := readSQLiteSchema(databaseFile, header)
-
-	for _, row := range schema.Rows {
-		if row.Type == "table" && row.Name != "sqlite_sequence" {
-			fmt.Println(row.Name)
-		}
-	}
+	return &header, nil
 }
