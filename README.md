@@ -118,6 +118,11 @@ deliberately doing none of them now (other than the very simple cache described
 above) because my primary aim is to get an end-to-end simple, extensible and
 functional system.
 
+Currently, the pager takes a filepath and opens the file itself. I'd like to spend
+some time thinking about what consequences this has on testing - would it be better
+to pass in a file that is opened elsewhere so that I could potentially mock a file
+in unit tests?
+
 ### Layer 2: BTreeEngine
 
 The BTreeEngine is responsible for providing an interface for callers to interact
