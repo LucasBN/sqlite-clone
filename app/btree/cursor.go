@@ -18,33 +18,39 @@ package btree
 // interpret them as a record (and get the column data from it). However, errors
 // may still occur if the cursor attempts, for example, to read past the end of
 // the page.
+
+type pagePosition struct {
+	ByteOffset uint64
+	CellNumber *uint64
+	PageNumber uint64
+}
+
 type cursor struct {
 	// The ID of the cursor
 	ID uint64
 
-	// The byte offset of the cursor on the current page
-	Position uint64
-
-	// The cell number of the cell that the cursor is currently pointing to
-	CurrentCell *uint64
-
-	// The page number of the page that the cursor is currently pointing to
-	CurrentPage uint64
+	PagePositionStack []pagePosition
 
 	// The page number of the root page of the B-Tree
 	RootPage uint64
 }
 
-const INT_IDX_PAGE = 2
-const INT_TAB_PAGE = 5
-const LEAF_IDX_PAGE = 10
-const LEAF_TAB_PAGE = 13
+func (cursor *cursor) CurrentPage() uint64 {
+	return cursor.PagePositionStack[len(cursor.PagePositionStack)-1].PageNumber
+}
 
-type bTreeHeader struct {
-	PageType                uint8
-	FirstFreeBlock          uint16
-	NumCells                uint16
-	CellContentOffset       uint16
-	NumFragmenttedFreeBytes uint8
-	RightMostPointer        uint32
+func (cursor *cursor) CurrentCell() *uint64 {
+	return cursor.PagePositionStack[len(cursor.PagePositionStack)-1].CellNumber
+}
+
+func (cursor *cursor) Position() uint64 {
+	return cursor.PagePositionStack[len(cursor.PagePositionStack)-1].ByteOffset
+}
+
+func (cursor *cursor) SetPosition(position uint64) {
+	cursor.PagePositionStack[len(cursor.PagePositionStack)-1].ByteOffset = position
+}
+
+func (cursor *cursor) SetCellNumber(cellNumber uint64) {
+	cursor.PagePositionStack[len(cursor.PagePositionStack)-1].CellNumber = &cellNumber
 }
