@@ -33,5 +33,55 @@ func getPageHeader(page []byte, pageNum uint64) (bTreeHeader, error) {
 	return header, nil
 }
 
+// --------------------------------------------
 
-// Read the page
+type page struct {
+	PageNumber uint64
+	Data []byte
+}
+
+func (p page) PageType() uint8 {
+	if p.PageNumber == 1 {
+		return p.Data[100]
+	}
+	return p.Data[0]
+}
+
+func (p page) NumCells() (uint16, error) {
+	pointer := 0
+	if p.PageNumber == 1 {
+		pointer += 100
+	}
+
+	var numCells uint16
+	err := binary.Read(bytes.NewBuffer(p.Data[pointer+3:pointer+4]), binary.BigEndian, &numCells)
+	if err != nil {
+		return 0, err
+	}
+	return numCells, nil
+}
+
+func (p page) RightMostPointer() (*uint32, error) {
+	// We only have pointers to other pages on interior pages
+	if p.PageType() != intIdxPage && p.PageType() != intTabPage {
+		return nil, nil
+	}
+
+	pointer := 0
+	if p.PageNumber == 1 {
+		pointer += 100
+	}
+
+	var rightMostPointer uint32
+	err := binary.Read(bytes.NewBuffer(p.Data[pointer+8:pointer+12]), binary.BigEndian, &rightMostPointer)
+	if err != nil {
+		return nil, err
+	}
+	return &rightMostPointer, nil
+}
+
+// ReadInteriorTableCell interprets the bytes starting at the given offset as an
+// interior table cell. 
+func (p page) ReadInteriorTableCell(offset uint64) (interiorTableCell, error) {
+	return p.Data[offset:], nil
+}

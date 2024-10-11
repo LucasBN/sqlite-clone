@@ -35,6 +35,26 @@ type resultTypeConstructor[T any] interface {
 	Null() T
 }
 
+
+func (b *BTreeEngine[T]) getPage(pageNum uint64) (page, error) {
+	p, err := b.pager.GetPage(pageNum)
+	if err != nil {
+		return page{}, err
+	}
+
+	return page{
+		PageNumber: pageNum,
+		Data:       p,
+	}, nil
+}
+
+
+
+
+
+
+// -----------------------------------------------------------------------------
+
 // NewCursor creates a new cursor with the given ID that points to the table or
 // index at the given root page number. The cursor is initialized to point at
 // the very beginning of the root page.
@@ -69,26 +89,27 @@ func (b *BTreeEngine[T]) RewindCursor(id uint64) (bool, error) {
 	}
 
 	// Get the root page
-	page, err := b.pager.GetPage(cursor.RootPage)
+	page, err := b.getPage(cursor.RootPage)
 	if err != nil {
 		return false, err
 	}
 
-	pageHeader, err := getPageHeader(page, cursor.RootPage)
-	if err != nil {
-		return false, err
-	}
-
-	for pageHeader.PageType != leafTabPage {
+	// If the root page is not a leaf page, we need to traverse the tree by
+	// taking the left most branch at each interior page until we reach a leaf
+	// page
+	for page.PageType() == intTabPage {
 		// Move the cursor to the first cell of the current page
 		ok, err := b.moveCursorToCell(cursor, 0)
 		if err != nil || !ok {
 			return false, err
 		}
 
-		// Extract the left pointer from the first cell
-		var leftPointer uint32
-		err = binary.Read(bytes.NewBuffer(page[cursor.Position():cursor.Position()+4]), binary.BigEndian, &leftPointer)
+		cell, err := page.ReadInteriorTableCell(cursor.Position())
+		if err != nil {
+			return false, err
+		}
+
+		leftChild, err := cell.LeftChild()
 		if err != nil {
 			return false, err
 		}
@@ -96,17 +117,11 @@ func (b *BTreeEngine[T]) RewindCursor(id uint64) (bool, error) {
 		// Update the cursor position stack
 		cursor.PagePositionStack = append(cursor.PagePositionStack, pagePosition{
 			ByteOffset: 0,
-			PageNumber: uint64(leftPointer),
+			PageNumber: leftChild,
 		})
 
 		// Get the left page
-		page, err = b.pager.GetPage(uint64(leftPointer))
-		if err != nil {
-			return false, err
-		}
-
-		// Get the header of the left page
-		pageHeader, err = getPageHeader(page, uint64(leftPointer))
+		page, err = b.getPage(leftChild)
 		if err != nil {
 			return false, err
 		}
