@@ -1,3 +1,13 @@
+Design options:
+
+- Constantly work with raw byte slices in every function (no)
+- Define types like `type InteriorTablePage []byte` and have functions on that
+  type such as `func (p InteriorTablePage) NumCells() uint64`
+- Instead of working with byte slices, have another layer which deserialises the
+  byte slices into structs and just work with those everywhere, and only
+  serialise the structs back into bytes when flushing to disk
+
+
 ## Example Usage
 
 ```go

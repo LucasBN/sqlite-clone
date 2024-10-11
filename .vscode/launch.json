@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto", // "auto" lets VSCode decide build/run mode
+      "program": "${workspaceFolder}/app", // Path to your app's source files
+      "args": ["sample.db", "SELECT * FROM users;"],
+      "env": {},
+      "buildFlags": "",
+      "cwd": "${workspaceFolder}",
+      "output": "${workspaceFolder}/bin/app", // Optional: specify a binary output location
+      "preLaunchTask": "", // Optional: you can define a task to run before debugging
+      "stopOnEntry": false, // Set to true if you want to pause at the program start
+      "showLog": true
+    }
+  ]
+}
