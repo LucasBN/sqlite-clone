@@ -1,30 +1,10 @@
 package btree
 
-// A cursor points to a specific entry in a b-tree, which means that it points
-// to a specific byte offset in the database.
-//
-// Currently, a cursor makes a very incorrect assumption that every page is a
-// leaf table page (no indexes, no interior pages). This means that we only need
-// to store the absolute byte offset within a database file that the cursor is
-// pointing to.
-//
-// Adding support for interior pages might require us to store more information,
-// as we'll probably need a way to jump from one page to another.
-//
-// Cursors also assume that the caller 'knows' what they're doing, and therefore
-// do not try to protect against 'invalid' operations. For example, if the
-// caller attempts to call ReadColumn on a cursor that isn't actually pointing
-// to a valid record, the cursor will read the bytes at the current position and
-// interpret them as a record (and get the column data from it). However, errors
-// may still occur if the cursor attempts, for example, to read past the end of
-// the page.
-
-type pagePosition struct {
-	ByteOffset uint64
-	CellNumber *uint64
-	PageNumber uint64
-}
-
+// A cursor is an internal structure that points at a particular entry in a
+// B-Tree. The PagePositionStack keeps track of how the cursor got to the
+// current page, so that it can back track and (for example) move from the last
+// entry on one page to the first entry on the other page. The last element in
+// the stack is the current page and entry that the cursor is pointing at.
 type cursor struct {
 	// The ID of the cursor
 	ID uint64
@@ -33,6 +13,16 @@ type cursor struct {
 
 	// The page number of the root page of the B-Tree
 	RootPage uint64
+}
+
+// A pagePosition points to a particular byte offset in a page. The cell number
+// is a pointer because it the cursor may not be pointing at a cell (but if it
+// is, then the CellNumber *should* be set and if it isn't then it should be
+// nil).
+type pagePosition struct {
+	ByteOffset uint64
+	CellNumber *uint64
+	PageNumber uint64
 }
 
 func (cursor *cursor) CurrentPage() uint64 {

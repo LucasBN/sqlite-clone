@@ -30,6 +30,10 @@ func (b *BTreeEngine[T]) NewCursor(id uint64, rootPageNum uint64) (bool, error) 
 	return true, nil
 }
 
+// RewindCursor moves the cursor to the first leaf cell in the table by
+// traversing the B-Tree (always taking the left most branch at each interior
+// page, and setting the cursor on every visited page to point at the first cell
+// on that page).
 func (b *BTreeEngine[T]) RewindCursor(id uint64) (bool, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
@@ -60,8 +64,12 @@ func (b *BTreeEngine[T]) RewindCursor(id uint64) (bool, error) {
 	return cursor.moveToCell(page, 0)
 }
 
-// AdvanceCursor moves the cursor to the next leaf cell in the database table or
-// index.
+// AdvanceCursor moves the cursor to the next leaf cell in table. If there is
+// a next cell on the current page (which should be a leaf page), then the
+// cursor is simply moved to that page. However, if we are at the last cell on a
+// leaf page, then we must use the cursor position stack to find the next leaf
+// page to visit. If the cursor already points to the very last cell in the
+// B-Tree, then this function will return false.
 func (b *BTreeEngine[T]) AdvanceCursor(id uint64) (bool, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
@@ -201,6 +209,8 @@ func (b *BTreeEngine[T]) AdvanceCursor(id uint64) (bool, error) {
 	return cursor.moveToCell(page, 0)
 }
 
+// ReadColumn reads the column at the given index from the current cell that the
+// cursor is pointing to.
 func (b *BTreeEngine[T]) ReadColumn(id uint64, column uint64) (T, error) {
 	// Get the cursor with the given ID
 	cursor, err := b.getCursor(id)
