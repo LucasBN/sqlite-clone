@@ -82,15 +82,19 @@ func TableWithInteriorPage() map[int][]byte {
 		Header: MockPageHeader{
 			PageType:               5,
 			FirstFreeBlock:         0,
-			NumCells:               1,
+			NumCells:               2,
 			CellContentOffset:      0,
 			NumFragmentedFreeBytes: 0,
-			RightMostPointer:       lo.ToPtr(uint32(4)),
+			RightMostPointer:       lo.ToPtr(uint32(5)),
 		},
 		Cells: []MockInteriorTableCell{
 			{
 				LeftChildPageNumber: 3,
 				Key:                 1,
+			},
+			{
+				LeftChildPageNumber: 4,
+				Key:                 2,
 			},
 		},
 	}
@@ -133,9 +137,29 @@ func TableWithInteriorPage() map[int][]byte {
 		},
 	}
 
+	pageFive := MockLeafTablePage{
+		Header: MockPageHeader{
+			PageType:               13,
+			FirstFreeBlock:         0,
+			NumCells:               1,
+			CellContentOffset:      0,
+			NumFragmentedFreeBytes: 0,
+			RightMostPointer:       nil,
+		},
+		Cells: []MockLeafTableCell{
+			{
+				Key: 3,
+				Entries: []types.Entry{
+					types.NumberEntry{Value: 3},
+				},
+			},
+		},
+	}
+
 	return map[int][]byte{
 		2: pageTwo.Serialize(),
 		3: pageThree.Serialize(),
 		4: pageFour.Serialize(),
+		5: pageFive.Serialize(),
 	}
 }

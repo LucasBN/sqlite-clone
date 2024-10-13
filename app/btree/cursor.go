@@ -54,3 +54,18 @@ func (cursor *cursor) SetPosition(position uint64) {
 func (cursor *cursor) SetCellNumber(cellNumber uint64) {
 	cursor.PagePositionStack[len(cursor.PagePositionStack)-1].CellNumber = &cellNumber
 }
+
+func (c *cursor) moveToCell(p btreePage, cellNumber uint64) (bool, error) {
+	newPosition, err := p.CellPointer(cellNumber)
+	if err != nil {
+		return false, err
+	}
+
+	// Set the position of the cursor to be the byte offset of the first cell
+	c.SetPosition(newPosition)
+
+	// Set the current cell of the cursor to be the first cell
+	c.SetCellNumber(cellNumber)
+
+	return true, nil
+}

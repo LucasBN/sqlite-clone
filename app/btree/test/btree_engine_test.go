@@ -33,7 +33,7 @@ func TestReadSingleLeafPageTable(t *testing.T) {
 	// Move the cursor to the first entry in the table
 	ok, err = engine.RewindCursor(0)
 	if !ok || err != nil {
-		t.Errorf("Failed to rewind Cursor")
+		t.Errorf("Failed to rewind Cursor: %s", err)
 		return
 	}
 
@@ -45,7 +45,7 @@ func TestReadSingleLeafPageTable(t *testing.T) {
 		for j := 0; j < 3; j++ {
 			column, err := engine.ReadColumn(0, uint64(j))
 			if err != nil {
-				t.Errorf("Failed to read column (%d, %d)", i, j)
+				t.Errorf("Failed to read column (%d, %d): %s", i, j, err)
 				return
 			}
 			switch value := column.(type) {
@@ -63,7 +63,7 @@ func TestReadSingleLeafPageTable(t *testing.T) {
 
 		_, err = engine.AdvanceCursor(0)
 		if err != nil {
-			t.Errorf("Failed to advance Cursor")
+			t.Errorf("Failed to advance Cursor: %s", err)
 			return
 		}
 	}
@@ -114,7 +114,8 @@ func TestReadSingleInteriorPageTable(t *testing.T) {
 	// We expect to read two rows:
 	// 1,
 	// 2,
-	for i := 0; i < 1; i++ {
+	// 3,
+	for i := 0; i < 3; i++ {
 		for j := 0; j < 1; j++ {
 			column, err := engine.ReadColumn(0, uint64(j))
 			if err != nil {
