@@ -19,12 +19,12 @@ type MockDatabaseHeader struct {
 }
 
 type MockPageHeader struct {
-	PageType                uint8
-	FirstFreeBlock          uint16
-	NumCells                uint16
-	CellContentOffset       uint16
+	PageType               uint8
+	FirstFreeBlock         uint16
+	NumCells               uint16
+	CellContentOffset      uint16
 	NumFragmentedFreeBytes uint8
-	RightMostPointer        *uint32
+	RightMostPointer       *uint32
 }
 
 func (h MockPageHeader) Serialize() []byte {
@@ -43,7 +43,7 @@ func (h MockPageHeader) Serialize() []byte {
 
 type MockInteriorTableCell struct {
 	LeftChildPageNumber uint32
-	Key uint64
+	Key                 uint64
 }
 
 func (c MockInteriorTableCell) Serialize() []byte {
@@ -55,7 +55,7 @@ func (c MockInteriorTableCell) Serialize() []byte {
 
 type MockInteriorTablePage struct {
 	Header MockPageHeader
-	Cells []MockInteriorTableCell
+	Cells  []MockInteriorTableCell
 }
 
 func (p MockInteriorTablePage) Serialize() []byte {
@@ -88,7 +88,7 @@ func (p MockInteriorTablePage) Serialize() []byte {
 }
 
 type MockLeafTableCell struct {
-	Key uint64
+	Key     uint64
 	Entries []types.Entry
 }
 
@@ -112,7 +112,7 @@ func (c MockLeafTableCell) Serialize() []byte {
 			// Store all numbers as big-endian 64-bit twos-complement integer
 			value := make([]byte, 8)
 			binary.BigEndian.PutUint64(value, uint64(entry.Value))
-			
+
 			values = append(values, value...)
 			serialTypes = append(serialTypes, 6)
 			recordHeaderSize += 1
@@ -148,7 +148,7 @@ func (c MockLeafTableCell) Serialize() []byte {
 	}
 
 	payloadSizeBuf := make([]byte, binary.MaxVarintLen64)
-	payloadSizeVarintSize := binary.PutUvarint(payloadSizeBuf, uint64(finalRecordHeaderSize + len(values)))
+	payloadSizeVarintSize := binary.PutUvarint(payloadSizeBuf, uint64(finalRecordHeaderSize+len(values)))
 	payloadSizeBuf = payloadSizeBuf[:payloadSizeVarintSize]
 
 	result := []byte{}
@@ -157,13 +157,13 @@ func (c MockLeafTableCell) Serialize() []byte {
 	result = append(result, sizeVarintBuf...)
 	result = append(result, serialTypes...)
 	result = append(result, values...)
-	
+
 	return result
 }
 
 type MockLeafTablePage struct {
 	Header MockPageHeader
-	Cells []MockLeafTableCell
+	Cells  []MockLeafTableCell
 }
 
 func (p MockLeafTablePage) Serialize() []byte {

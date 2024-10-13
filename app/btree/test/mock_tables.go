@@ -9,14 +9,14 @@ import (
 
 func FirstPage() []byte {
 	header := MockDatabaseHeader{
-		HeaderString: [16]byte{'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3', '\x00'},
-		PageSize: pageSize,
+		HeaderString:     [16]byte{'S', 'Q', 'L', 'i', 't', 'e', ' ', 'f', 'o', 'r', 'm', 'a', 't', ' ', '3', '\x00'},
+		PageSize:         pageSize,
 		FileWriteVersion: 1,
-		FileReadVersion: 1,
-		ReservedSpace: 0,
-		Middle: [38]byte{},
-		TextEncoding: 1,
-		End: [40]byte{},
+		FileReadVersion:  1,
+		ReservedSpace:    0,
+		Middle:           [38]byte{},
+		TextEncoding:     1,
+		End:              [40]byte{},
 	}
 
 	buf := make([]byte, pageSize)
@@ -36,12 +36,12 @@ func TableWithSingleLeafPage() map[int][]byte {
 
 	pageTwo := MockLeafTablePage{
 		Header: MockPageHeader{
-			PageType: 13,
-			FirstFreeBlock: 0,
-			NumCells: 3,
-			CellContentOffset: 0,
+			PageType:               13,
+			FirstFreeBlock:         0,
+			NumCells:               3,
+			CellContentOffset:      0,
 			NumFragmentedFreeBytes: 0,
-			RightMostPointer: nil,
+			RightMostPointer:       nil,
 		},
 		Cells: []MockLeafTableCell{
 			{
@@ -80,29 +80,29 @@ func TableWithInteriorPage() map[int][]byte {
 
 	pageTwo := MockInteriorTablePage{
 		Header: MockPageHeader{
-			PageType: 5,
-			FirstFreeBlock: 0,
-			NumCells: 1,
-			CellContentOffset: 0,
+			PageType:               5,
+			FirstFreeBlock:         0,
+			NumCells:               1,
+			CellContentOffset:      0,
 			NumFragmentedFreeBytes: 0,
-			RightMostPointer: lo.ToPtr(uint32(4)),
+			RightMostPointer:       lo.ToPtr(uint32(4)),
 		},
 		Cells: []MockInteriorTableCell{
 			{
 				LeftChildPageNumber: 3,
-				Key: 1,
+				Key:                 1,
 			},
 		},
 	}
 
 	pageThree := MockLeafTablePage{
 		Header: MockPageHeader{
-			PageType: 13,
-			FirstFreeBlock: 0,
-			NumCells: 1,
-			CellContentOffset: 0,
+			PageType:               13,
+			FirstFreeBlock:         0,
+			NumCells:               1,
+			CellContentOffset:      0,
 			NumFragmentedFreeBytes: 0,
-			RightMostPointer: nil,
+			RightMostPointer:       nil,
 		},
 		Cells: []MockLeafTableCell{
 			{
@@ -116,12 +116,12 @@ func TableWithInteriorPage() map[int][]byte {
 
 	pageFour := MockLeafTablePage{
 		Header: MockPageHeader{
-			PageType: 13,
-			FirstFreeBlock: 0,
-			NumCells: 1,
-			CellContentOffset: 0,
+			PageType:               13,
+			FirstFreeBlock:         0,
+			NumCells:               1,
+			CellContentOffset:      0,
 			NumFragmentedFreeBytes: 0,
-			RightMostPointer: nil,
+			RightMostPointer:       nil,
 		},
 		Cells: []MockLeafTableCell{
 			{

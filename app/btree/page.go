@@ -37,7 +37,7 @@ func getPageHeader(page []byte, pageNum uint64) (bTreeHeader, error) {
 
 type page struct {
 	PageNumber uint64
-	Data []byte
+	Data       []byte
 }
 
 func (p page) PageType() uint8 {
@@ -81,7 +81,7 @@ func (p page) RightMostPointer() (*uint32, error) {
 }
 
 // ReadInteriorTableCell interprets the bytes starting at the given offset as an
-// interior table cell. 
+// interior table cell.
 func (p page) ReadInteriorTableCell(offset uint64) (interiorTableCell, error) {
 	return p.Data[offset:], nil
 }

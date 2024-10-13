@@ -35,7 +35,6 @@ type resultTypeConstructor[T any] interface {
 	Null() T
 }
 
-
 func (b *BTreeEngine[T]) getPage(pageNum uint64) (page, error) {
 	p, err := b.pager.GetPage(pageNum)
 	if err != nil {
@@ -47,11 +46,6 @@ func (b *BTreeEngine[T]) getPage(pageNum uint64) (page, error) {
 		Data:       p,
 	}, nil
 }
-
-
-
-
-
 
 // -----------------------------------------------------------------------------
 
@@ -182,11 +176,11 @@ func (b *BTreeEngine[T]) AdvanceCursor2(id uint64) (bool, error) {
 		return false, err
 	}
 
-	if (pageHeader.PageType != leafTabPage) {
+	if pageHeader.PageType != leafTabPage {
 		return false, errors.New("expected page to be a leaf table page")
 	}
 
-	if (uint64(pageHeader.NumCells) > *cursor.CurrentCell()+1) {
+	if uint64(pageHeader.NumCells) > *cursor.CurrentCell()+1 {
 		// There's another cell on this leaf page, so just go to that
 		return b.moveCursorToCell(cursor, *cursor.CurrentCell()+1)
 	}
@@ -196,10 +190,9 @@ func (b *BTreeEngine[T]) AdvanceCursor2(id uint64) (bool, error) {
 	cursor.PagePositionStack = cursor.PagePositionStack[:len(cursor.PagePositionStack)-1]
 
 	// There are no parent pages and we have processed the last cell
-	if (len(cursor.PagePositionStack) == 0) {
+	if len(cursor.PagePositionStack) == 0 {
 		return false, nil
 	}
-
 
 	// The position stack now consists of some number of interior table pages.
 	// Our goal is to find the first page (starting from the top of the stack)
@@ -218,7 +211,7 @@ func (b *BTreeEngine[T]) AdvanceCursor2(id uint64) (bool, error) {
 
 	for {
 		// An index page has X cells, but also a right pointer.
-		if (*cursor.CurrentCell()+1 < uint64(pageHeader.NumCells)) {
+		if *cursor.CurrentCell()+1 < uint64(pageHeader.NumCells) {
 			// There's another cell on this page, so let's go to that
 			didAdvance, err := b.moveCursorToCell(cursor, *cursor.CurrentCell()+1)
 			if err != nil {
@@ -254,11 +247,11 @@ func (b *BTreeEngine[T]) AdvanceCursor2(id uint64) (bool, error) {
 			}
 
 			break
-		} else if (*cursor.CurrentCell()+1 == uint64(pageHeader.NumCells)) {
+		} else if *cursor.CurrentCell()+1 == uint64(pageHeader.NumCells) {
 			// Pop the current page off the stack
 			cursor.PagePositionStack = cursor.PagePositionStack[:len(cursor.PagePositionStack)-1]
 
-			// Move to the right pointer 
+			// Move to the right pointer
 			rightPointer := pageHeader.RightMostPointer
 
 			// Update the cursor position stack
@@ -284,13 +277,13 @@ func (b *BTreeEngine[T]) AdvanceCursor2(id uint64) (bool, error) {
 
 		// Otherwise, we've already gone to page pointed to by the right pointer
 		// and we should pop this page from the stack
-		
+
 		// Drop the last element of the position stack, as it is pointing to the
 		// last element on a leaf page we've already traversed
 		cursor.PagePositionStack = cursor.PagePositionStack[:len(cursor.PagePositionStack)-1]
 
 		// There are no parent pages and we have processed the last cell
-		if (len(cursor.PagePositionStack) == 0) {
+		if len(cursor.PagePositionStack) == 0 {
 			return false, nil
 		}
 
@@ -439,7 +432,7 @@ func (b *BTreeEngine[T]) ReadColumn(id uint64, column uint64) (T, error) {
 			value := cell[pointer : pointer+size]
 			pointer += size
 
-			padding := bytes.Repeat([]byte{0}, 8 - int(size))
+			padding := bytes.Repeat([]byte{0}, 8-int(size))
 			value = append(padding, value...)
 
 			entry = b.resultConstructor.Number(int64(binary.BigEndian.Uint64(value)))
