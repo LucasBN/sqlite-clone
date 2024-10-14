@@ -224,16 +224,17 @@ func (b *BTreeEngine[T]) ReadColumn(id uint64, column uint64) (T, error) {
 		return b.resultConstructor.Null(), err
 	}
 
-	// Read the cell data from the page
+	// Read the cell data that the cursor is pointing at
 	cell, err := page.ReadLeafTableCell(cursor.Position())
 	if err != nil {
 		return b.resultConstructor.Null(), err
 	}
 
-	cellPayload := cell.Payload()
+	// Construct a record from the cell
+	record, err := b.constructLeafTableCellRecord(cell)
+	if err != nil {
+		return b.resultConstructor.Null(), err
+	}
 
-	return record[T]{
-		ResultConstructor: b.resultConstructor,
-		Data:              cellPayload,
-	}.ReadColumn(column)
+	return record.ReadColumn(column)
 }

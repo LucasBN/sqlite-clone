@@ -24,16 +24,22 @@ func (c interiorTableCell) LeftChild() (uint64, error) {
 // -------------------------------------
 type leafTableCell []byte
 
-func (c leafTableCell) Payload() []byte {
+func (c leafTableCell) Payload() ([]byte, error) {
 	pointer := uint64(0)
 
 	// Detemine the payload size and the size of the varint that stores it
-	_, payloadSizeVarintSize := binary.Uvarint(c[pointer:])
-	pointer += uint64(payloadSizeVarintSize)
+	_, payloadSizeVarintSize, err := decodeUvarint(c[pointer:])
+	if err != nil {
+		return nil, err
+	}
+	pointer += payloadSizeVarintSize
 
 	// Determine the size of the rowid varint
-	_, rowidVarintSize := binary.Uvarint(c[pointer:])
-	pointer += uint64(rowidVarintSize)
+	_, rowidVarintSize, err := decodeUvarint(c[pointer:])
+	if err != nil {
+		return nil, err
+	}
+	pointer += rowidVarintSize
 
-	return c[pointer:]
+	return c[pointer:], nil
 }

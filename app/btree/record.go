@@ -29,8 +29,11 @@ func (r record[T]) ReadColumn(column uint64) (T, error) {
 	pointer := uint64(0)
 
 	// Read the header size varint
-	headerSize, headerSizeVarintSize := binary.Uvarint(r.Data)
-	pointer += uint64(headerSizeVarintSize)
+	headerSize, headerSizeVarintSize, err := decodeUvarint(r.Data)
+	if err != nil {
+		return r.ResultConstructor.Null(), err
+	}
+	pointer += headerSizeVarintSize
 
 	// We need to loop over every column that comes before the one we want to
 	// read so that we can determine both the offset in the body at which the
@@ -39,8 +42,11 @@ func (r record[T]) ReadColumn(column uint64) (T, error) {
 	// body (i.e the end of the header).
 	typeCode, columnOffset, columnSize := uint64(0), uint64(0), uint64(0)
 	for i := uint64(0); i <= column; i++ {
-		code, varintSize := binary.Uvarint(r.Data[pointer:])
-		pointer += uint64(varintSize)
+		code, varintSize, err := decodeUvarint(r.Data[pointer:])
+		if err != nil {
+			return r.ResultConstructor.Null(), err
+		}
+		pointer += varintSize
 
 		typeCode = code
 		columnSize = sizeForTypeCode(code)

@@ -100,20 +100,29 @@ func (p btreePage) CellPointer(cellNum uint64) (uint64, error) {
 func (p btreePage) ReadInteriorTableCell(offset uint64) (interiorTableCell, error) {
 	// Read the varint after the left child pointer so that we can determine the
 	// total size of the cell
-	_, bytesRead := binary.Uvarint(p.Data[offset+4:])
+	_, bytesRead, err := decodeUvarint(p.Data[offset+4:])
+	if err != nil {
+		return interiorTableCell{}, err
+	}
 
-	return p.Data[offset : offset+uint64(bytesRead)+4], nil
+	return p.Data[offset : offset+bytesRead+4], nil
 }
 
 func (p btreePage) ReadLeafTableCell(offset uint64) (leafTableCell, error) {
 	cellEnd := offset
 
 	// Detemine the payload size and the size of the varint that stores it
-	payloadSize, payloadSizeVarintSize := binary.Uvarint(p.Data[offset:])
+	payloadSize, payloadSizeVarintSize, err := decodeUvarint(p.Data[offset:])
+	if err != nil {
+		return nil, err
+	}
 	cellEnd += payloadSize + uint64(payloadSizeVarintSize)
 
 	// Determine the size of the rowid varint
-	_, rowidVarintSize := binary.Uvarint(p.Data[offset+uint64(payloadSizeVarintSize):])
+	_, rowidVarintSize, err := decodeUvarint(p.Data[offset+uint64(payloadSizeVarintSize):])
+	if err != nil {
+		return nil, err
+	}
 	cellEnd += uint64(rowidVarintSize)
 
 	// For now, we're only going to support cells that have zero overflow pages
