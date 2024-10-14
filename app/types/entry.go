@@ -19,7 +19,7 @@ type Entry interface{}
 type NullEntry struct{}
 
 type NumberEntry struct {
-	Value uint64
+	Value int64
 }
 
 type TextEntry struct {
@@ -28,7 +28,7 @@ type TextEntry struct {
 
 type EntryConstructor struct{}
 
-func (r *EntryConstructor) Number(value uint64) Entry {
+func (r *EntryConstructor) Number(value int64) Entry {
 	return NumberEntry{Value: value}
 }
 
