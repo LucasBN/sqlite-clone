@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"github/com/lucasbn/sqlite-clone/app/types"
 
+	"math/rand"
+
 	"github.com/samber/lo"
 )
 
@@ -75,6 +77,84 @@ func TableWithSingleLeafPage() map[int][]byte {
 		2: pageTwo.Serialize(),
 	}
 }
+
+func generateRandomString(length int, r *rand.Rand) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	result := make([]byte, length)
+	for i := range result {
+		result[i] = charset[r.Intn(len(charset))]
+	}
+	return string(result)
+}
+
+func GenerateRandomLeafTablePage(columnTypes []int, r *rand.Rand) MockLeafTablePage {
+	// The BTreeHeader is 8 bytes long, so we set this as the initial amount of
+	// used bytes in the page
+	totalSize := 8
+
+	var cells []MockLeafTableCell
+
+	for i := 0; true; i++ {
+		var entries []types.Entry
+		for _, columnType := range columnTypes {
+			switch columnType {
+			case 0:
+				// Add a null entry
+				entries = append(entries, types.NullEntry{})
+			case 1:
+				// Add a random int entry
+				randomValue := r.Int63()
+				entries = append(entries, types.NumberEntry{Value: randomValue})
+			case 2:
+				// Add a random text entry
+				length := r.Intn(20) + 1
+				randomString := generateRandomString(length, r)
+				entries = append(entries, types.TextEntry{Value: randomString})
+			}
+		}
+
+		cell := MockLeafTableCell{
+			Key:     uint64(i),
+			Entries: entries,
+		}
+
+		// Check if this page will cause the page to overflow and break
+		// if it does. Each cell we add will use 2 bytes for the cell pointer,
+		// and then however many bytes the cell itself takes up
+		totalSize += 2
+		totalSize += len(cell.Serialize())
+		if totalSize > pageSize {
+			break
+		}
+
+		cells = append(cells, cell)
+	}
+
+	return MockLeafTablePage{
+		Header: MockPageHeader{
+			PageType:               13,
+			FirstFreeBlock:         0,
+			NumCells:               uint16(len(cells)),
+			CellContentOffset:      0,
+			NumFragmentedFreeBytes: 0,
+			RightMostPointer:       nil,
+		},
+		Cells: cells,
+	}
+}
+
+// func GenerateRandomTable2(firstPageNum int, depth uint64, columnTypes []int) map[int][]byte {
+// 	// The base case is when the depth is 1, in which case we create a leaf page
+// 	if depth == 1 {
+// 		return map[int][]byte{
+// 			firstPageNum: GenerateRandomLeafTablePage(columnTypes).Serialize(),
+// 		}
+// 	}
+
+// 	// Otherwise, we need to create an interior page and then recursively create
+// 	// the children of the interior page
+// 	return map[int][]byte{}
+// }
 
 func TableWithInteriorPage() map[int][]byte {
 
