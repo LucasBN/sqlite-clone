@@ -143,18 +143,90 @@ func GenerateRandomLeafTablePage(columnTypes []int, r *rand.Rand) MockLeafTableP
 	}
 }
 
-// func GenerateRandomTable2(firstPageNum int, depth uint64, columnTypes []int) map[int][]byte {
-// 	// The base case is when the depth is 1, in which case we create a leaf page
-// 	if depth == 1 {
-// 		return map[int][]byte{
-// 			firstPageNum: GenerateRandomLeafTablePage(columnTypes).Serialize(),
-// 		}
-// 	}
+type LeafOrInteriorPage struct {
+	PageType int
+	Leaf     MockLeafTablePage
+	Interior MockInteriorTablePage
+}
 
-// 	// Otherwise, we need to create an interior page and then recursively create
-// 	// the children of the interior page
-// 	return map[int][]byte{}
-// }
+func GenerateRandomTable(firstPageNum uint32, depth uint64, columnTypes []int, r *rand.Rand) map[uint32]LeafOrInteriorPage {
+	// The base case is when the depth is 1, in which case we create a leaf page
+	if depth == 1 {
+		return map[uint32]LeafOrInteriorPage{
+			firstPageNum: {
+				PageType: 13,
+				Leaf:     GenerateRandomLeafTablePage(columnTypes, r),
+			},
+		}
+	}
+
+	// Otherwise, we need to create an interior page and then recursively create
+	// the children of the interior page
+
+	// The BTreeHeader is 12 bytes long, so we set this as the initial amount of
+	// used bytes in the page.
+	totalSize := 12
+
+	pages := make(map[uint32]LeafOrInteriorPage)
+
+	var cells []MockInteriorTableCell
+
+	pagePointer := uint32(firstPageNum + 1)
+	rightMostPointer := uint32(0)
+
+	for i := 0; true; i++ {
+		cell := MockInteriorTableCell{
+			LeftChildPageNumber: pagePointer,
+			Key:                 uint64(i),
+		}
+
+		// Generate the child page
+		childPages := GenerateRandomTable(pagePointer, depth-1, columnTypes, r)
+
+		// Add all of the child pages to the map
+		for k, v := range childPages {
+			pages[k] = v
+		}
+
+		// Check if this page will cause the page to overflow and break
+		// if it does. Each cell we add will use 2 bytes for the cell pointer,
+		// and then however many bytes the cell itself takes up
+		totalSize += 2
+		totalSize += len(cell.Serialize())
+		if totalSize > pageSize {
+			// Instead of appending the cell, we fill out the right most pointer
+			// and break
+			rightMostPointer = pagePointer
+			break
+		}
+
+		cells = append(cells, cell)
+
+		// The recursive call could result in multiple child pages being
+		// generated
+		pagePointer += uint32(len(childPages))
+	}
+
+	interiorPage := MockInteriorTablePage{
+		Header: MockPageHeader{
+			PageType:               5,
+			FirstFreeBlock:         0,
+			NumCells:               uint16(len(cells)),
+			CellContentOffset:      0,
+			NumFragmentedFreeBytes: 0,
+			RightMostPointer:       lo.ToPtr(rightMostPointer),
+		},
+		Cells: cells,
+	}
+
+	// Add the interior page to the page map
+	pages[firstPageNum] = LeafOrInteriorPage{
+		PageType: 5,
+		Interior: interiorPage,
+	}
+
+	return pages
+}
 
 func TableWithInteriorPage() map[int][]byte {
 

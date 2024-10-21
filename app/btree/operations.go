@@ -206,6 +206,11 @@ func (b *BTreeEngine[T]) AdvanceCursor(id uint64) (bool, error) {
 		return false, err
 	}
 
+	page, err = b.getPage(cursor.CurrentPage())
+	if err != nil {
+		return false, err
+	}
+
 	return cursor.moveToCell(page, 0)
 }
 
