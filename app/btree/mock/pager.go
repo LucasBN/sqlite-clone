@@ -1,4 +1,4 @@
-package test_btree
+package mock
 
 const pageSize = 4096
 

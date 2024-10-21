@@ -1,8 +1,9 @@
-package test_btree
+package btree_test
 
 import (
 	"fmt"
 	"github/com/lucasbn/sqlite-clone/app/btree"
+	"github/com/lucasbn/sqlite-clone/app/btree/mock"
 	"github/com/lucasbn/sqlite-clone/app/types"
 	"math/rand"
 	"testing"
@@ -33,11 +34,11 @@ func TestRandomTable(t *testing.T) {
 		}
 
 		// Generate a random leaf table page with the generated column types
-		randomPages := GenerateRandomTable(2, height, columnTypes, r)
+		randomPages := mock.GenerateRandomTable(2, height, columnTypes, r)
 
 		// Create the mock pager, which initially contains a single page with the
 		// database header and is otherwise empty.
-		pager := NewMockPager()
+		pager := mock.NewMockPager()
 
 		// Write the table data to the pager
 		pager.WritePages(randomPages)
