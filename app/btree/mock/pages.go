@@ -1,4 +1,4 @@
-package test_btree
+package mock
 
 import (
 	"encoding/binary"
