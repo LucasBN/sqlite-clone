@@ -19,6 +19,20 @@ func (p *MockPager) WritePage(pageNum int, data []byte) error {
 	return nil
 }
 
+func (p *MockPager) WritePages(pageMap map[uint32]LeafOrInteriorPage) error {
+	for pageNum, data := range pageMap {
+		switch data.PageType {
+		case 5:
+			p.pages[int(pageNum)] = data.Interior.Serialize()
+		case 13:
+			p.pages[int(pageNum)] = data.Leaf.Serialize()
+		default:
+			return nil
+		}
+	}
+	return nil
+}
+
 func (p *MockPager) Close() error {
 	return nil
 }
